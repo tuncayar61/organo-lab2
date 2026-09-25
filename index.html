@@ -329,9 +329,9 @@
         </button>
 
         <!-- CANLI BULUT / GOOGLE DRIVE SENKRONİZASYON BUTONU -->
-        <button id="btnCloudSyncHeader" onclick="syncWithCloudNow(true)" class="bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-2 transition border border-indigo-500/50 cursor-pointer" title="Google Drive Ortak Veritabanı ile Anlık Senkronize Et (İki Bilgisayar Arası Canlı Eşitleme)">
+        <button id="btnCloudSyncHeader" onclick="syncWithCloudNow(true)" class="bg-gradient-to-r from-slate-900 to-indigo-950 hover:from-slate-800 hover:to-indigo-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-2 transition border border-indigo-500/50 cursor-pointer" title="Firebase Canlı Ortak Veritabanı ile Anlık Senkronize Et (İki Bilgisayar Arası Canlı Eşitleme)">
           <i id="cloudSyncHeaderIcon" class="fa-solid fa-cloud text-sky-400"></i>
-          <span id="cloudSyncHeaderText">Bulut Eşitle</span>
+          <span id="cloudSyncHeaderText">Bulut: Canlı (Firebase)</span>
           <span id="cloudSyncBadge" class="bg-indigo-600/80 text-white text-[9.5px] px-1.5 py-0.2 rounded font-bold border border-indigo-400/40">Canlı</span>
         </button>
 
@@ -3031,40 +3031,104 @@
     }
 
     // ========================================================
-    // GOOGLE DRIVE & APPS SCRIPT CANLI BULUT SENKRONİZASYON MOTORU
+    // FIREBASE REALTIME DATABASE CANLI BULUT SENKRONİZASYON MOTORU
     // ========================================================
+    const FIREBASE_BASE_URL = "https://organo-lab-default-rtdb.firebaseio.com";
+    const FIREBASE_ENDPOINT = "https://organo-lab-default-rtdb.firebaseio.com/lab_master_db.json";
+    
     let cloudSyncDebounceTimer = null;
     let isCloudSyncInProgress = false;
-
-    function getCloudSyncUrl() {
-      const custom = (SafeStorage.getItem("organo_lab_custom_base_url") || "").trim();
-      if (custom && custom.startsWith("http")) return custom;
-      if (typeof window !== "undefined" && window.location.href.includes("script.google.com")) {
-        return window.location.href.split("#")[0].split("?")[0];
-      }
-      return "";
-    }
+    let firebaseSseSource = null;
+    let lastCloudSyncTimestamp = 0;
 
     function triggerCloudSyncDebounced() {
       if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
       cloudSyncDebounceTimer = setTimeout(() => {
         syncWithCloudNow(false);
-      }, 1200);
+      }, 800);
     }
 
-    function syncWithCloudNow(isUserInitiated = false) {
-      if (isCloudSyncInProgress) return;
-      const syncUrl = getCloudSyncUrl();
-      const hasGoogleScriptRun = (typeof google !== "undefined" && google.script && google.script.run);
+    function initFirebaseRealtime() {
+      // 1. Sayfa açılır açılmaz sunucudaki en güncel kayıtları çek
+      setTimeout(() => { triggerFirebasePull(false); }, 400);
 
-      if (!hasGoogleScriptRun && !syncUrl) {
-        if (isUserInitiated) {
-          alert("Bulut senkronizasyonu için lütfen önce 'Kullanıcı Davet Et' menüsünden Google Apps Script Web App adresinizi (https://script.google.com/...) kaydediniz.");
+      // 2. Canlı Dinleyici (Server-Sent Events / SSE)
+      if (typeof EventSource !== "undefined") {
+        try {
+          if (firebaseSseSource) firebaseSseSource.close();
+          firebaseSseSource = new EventSource(FIREBASE_ENDPOINT);
+
+          firebaseSseSource.addEventListener("put", function(e) {
+            try {
+              const payload = JSON.parse(e.data);
+              if (payload && typeof payload === "object") {
+                if (payload.path === "/" && payload.data) {
+                  // Tüm veritabanı değişti
+                  handleCloudSyncResponse(payload.data, false);
+                } else if (payload.path === "/records" && Array.isArray(payload.data)) {
+                  handleCloudSyncResponse({ records: payload.data }, false);
+                } else if (payload.path && payload.path !== "/") {
+                  // Kısmi güncelleme geldiyse tam sorgu çek
+                  triggerFirebasePull(false);
+                }
+              }
+            } catch(err) {
+              console.warn("Firebase SSE ayrıştırma hatası:", err);
+            }
+          });
+
+          firebaseSseSource.onerror = function() {
+            // SSE kesilirse arka plan sorgusu devralır
+          };
+        } catch(err) {
+          console.warn("EventSource başlatılamadı:", err);
         }
-        return;
       }
 
+      // 3. Arka plan sorgusu (Her 15 saniyede bir garantileme)
+      setInterval(() => {
+        triggerFirebasePull(false);
+      }, 15000);
+
+      // 4. Kullanıcı sekmeye her döndüğünde anında tazele
+      window.addEventListener("focus", () => {
+        triggerFirebasePull(false);
+      });
+    }
+
+    // Sadece sunucudaki güncel verileri çekip yerelle birleştirir
+    function triggerFirebasePull(isUserInitiated = false) {
+      if (isCloudSyncInProgress) return;
+      
+      const icon = document.getElementById("cloudSyncHeaderIcon");
+      const text = document.getElementById("cloudSyncHeaderText");
+      const badge = document.getElementById("cloudSyncBadge");
+
+      fetch(FIREBASE_ENDPOINT)
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+          return res.json();
+        })
+        .then(remoteDb => {
+          if (remoteDb && remoteDb.records) {
+            handleCloudSyncResponse(remoteDb, isUserInitiated);
+          } else if (remoteDb === null) {
+            // Veritabanı henüz boşsa yereldeki kayıtları sunucuya yaz
+            pushLocalToFirebase(isUserInitiated);
+          } else {
+            setCloudStatusReady();
+          }
+        })
+        .catch(err => {
+          handleCloudSyncError(err, isUserInitiated);
+        });
+    }
+
+    // Hem sunucudan çeker, birleştirir ve sunucuya geri yazar
+    function syncWithCloudNow(isUserInitiated = false) {
+      if (isCloudSyncInProgress) return;
       isCloudSyncInProgress = true;
+
       const icon = document.getElementById("cloudSyncHeaderIcon");
       const text = document.getElementById("cloudSyncHeaderText");
       const badge = document.getElementById("cloudSyncBadge");
@@ -3076,7 +3140,70 @@
         badge.innerText = "Eşitleniyor";
       }
 
-      const clientBundle = {
+      // Önce sunucudaki veriyi oku
+      fetch(FIREBASE_ENDPOINT)
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+          return res.json();
+        })
+        .then(remoteDb => {
+          const recordMap = new Map();
+
+          // 1. Sunucudaki kayıtları haritaya ekle
+          if (remoteDb && Array.isArray(remoteDb.records)) {
+            remoteDb.records.forEach(r => { if (r && r.id) recordMap.set(r.id, r); });
+          }
+
+          // 2. Yereldeki kayıtları haritaya ekle (güncelleri ez veya yeni ekle)
+          if (Array.isArray(labRecords)) {
+            labRecords.forEach(r => { if (r && r.id) recordMap.set(r.id, r); });
+          }
+
+          const mergedRecords = Array.from(recordMap.values());
+          mergedRecords.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+          // 3. Ürün kartları ve listeleri birleştir
+          let mergedProductCards = Object.assign({}, (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}));
+          if (remoteDb && remoteDb.productCards) {
+            mergedProductCards = Object.assign({}, mergedProductCards, remoteDb.productCards);
+          }
+
+          let mergedUrunList = Array.from(new Set([...URUN_LIST, ...((remoteDb && remoteDb.urunList) || [])]));
+
+          const bundleToPush = {
+            records: mergedRecords,
+            productCards: mergedProductCards,
+            urunList: mergedUrunList,
+            hatList: HAT_LIST,
+            gozList: GOZ_LIST,
+            personelList: PERSONEL_LIST,
+            vardiyaList: VARDIYA_LIST,
+            usersList: usersList,
+            roleTemplates: roleTemplates,
+            lastUpdated: new Date().toISOString()
+          };
+
+          // Sunucuya PUT ile güncel birleşik hali gönder
+          return fetch(FIREBASE_ENDPOINT, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(bundleToPush)
+          })
+          .then(res => {
+            if (!res.ok) throw new Error("HTTP PUT " + res.status);
+            return bundleToPush;
+          });
+        })
+        .then(finalBundle => {
+          handleCloudSyncResponse(finalBundle, isUserInitiated);
+        })
+        .catch(err => {
+          handleCloudSyncError(err, isUserInitiated);
+        });
+    }
+
+    function pushLocalToFirebase(isUserInitiated = false) {
+      const bundleToPush = {
         records: labRecords,
         productCards: (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}),
         urunList: URUN_LIST,
@@ -3089,38 +3216,18 @@
         lastUpdated: new Date().toISOString()
       };
 
-      // YÖNTEM A: Google Apps Script Web App içinde çalışıyorsa (google.script.run)
-      if (hasGoogleScriptRun) {
-        try {
-          google.script.run
-            .withSuccessHandler(function(serverResult) {
-              handleCloudSyncResponse(serverResult, isUserInitiated);
-            })
-            .withFailureHandler(function(err) {
-              handleCloudSyncError(err, isUserInitiated);
-            })
-            .syncDatabaseFromServer(JSON.stringify(clientBundle));
-          return;
-        } catch(e) {
-          console.warn("google.script.run fallback to fetch:", e);
-        }
-      }
-
-      // YÖNTEM B: Harici tarayıcı veya yerel açılış ise (Fetch API)
-      if (syncUrl) {
-        fetch(syncUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "syncDatabase", data: clientBundle })
-        })
-        .then(res => res.json())
-        .then(serverResult => {
-          handleCloudSyncResponse(serverResult, isUserInitiated);
-        })
-        .catch(err => {
-          handleCloudSyncError(err, isUserInitiated);
-        });
-      }
+      fetch(FIREBASE_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bundleToPush)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP PUT " + res.status);
+        handleCloudSyncResponse(bundleToPush, isUserInitiated);
+      })
+      .catch(err => {
+        handleCloudSyncError(err, isUserInitiated);
+      });
     }
 
     function handleCloudSyncResponse(serverResult, isUserInitiated) {
@@ -3136,26 +3243,33 @@
         }
 
         if (db && Array.isArray(db.records)) {
-          // İki tarafın kayıtlarını akıllıca birleştir (Merge)
           const recordMap = new Map();
-          // Önce yerel kayıtlar
           if (Array.isArray(labRecords)) {
             labRecords.forEach(r => { if (r && r.id) recordMap.set(r.id, r); });
           }
-          // Sunucudan gelen kayıtlar (eksik olanlar eklenir, günceller ezilir)
+
           let addedCount = 0;
+          let changedCount = 0;
           db.records.forEach(r => {
             if (r && r.id) {
-              if (!recordMap.has(r.id)) addedCount++;
+              if (!recordMap.has(r.id)) {
+                addedCount++;
+              } else {
+                const existing = recordMap.get(r.id);
+                if (JSON.stringify(existing) !== JSON.stringify(r)) {
+                  changedCount++;
+                }
+              }
               recordMap.set(r.id, r);
             }
           });
 
           const mergedRecords = Array.from(recordMap.values());
           mergedRecords.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+          const hadChanges = (addedCount > 0 || changedCount > 0 || mergedRecords.length !== labRecords.length);
           labRecords = mergedRecords;
 
-          // Ürün kartları ve master datayı da birleştir
           if (db.productCards && Object.keys(db.productCards).length > 0) {
             PRODUCT_CARDS = Object.assign({}, PRODUCT_CARDS, db.productCards);
             SafeStorage.setItem("LAB_ERP_PRODUCT_CARDS", JSON.stringify(PRODUCT_CARDS));
@@ -3170,47 +3284,71 @@
           SafeStorage.setItem("LAB_ERP_RECORDS", jsonStr);
           SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
 
-          renderTable(labRecords);
+          if (hadChanges || isUserInitiated) {
+            renderTable(labRecords);
+          }
 
           if (icon) icon.className = "fa-solid fa-cloud-arrow-up text-emerald-400";
-          if (text) text.innerText = `Bulut: Eşitlendi (${labRecords.length})`;
+          if (text) text.innerText = `Bulut: Canlı (${labRecords.length})`;
           if (badge) {
             badge.className = "bg-emerald-600 text-white text-[9.5px] px-1.5 py-0.2 rounded font-bold shadow-xs";
             badge.innerText = "Canlı";
           }
 
           if (isUserInitiated && typeof showToastNotification === "function") {
-            showToastNotification(`Google Drive ortak veritabanı ile eşitlendi! (Toplam: ${labRecords.length} analiz kaydı)`);
+            showToastNotification(`Firebase ortak veritabanı ile eşitlendi! (Toplam: ${labRecords.length} analiz kaydı)`);
           } else if (addedCount > 0 && typeof showToastNotification === "function") {
-            showToastNotification(`Google Drive'dan ${addedCount} yeni analiz kaydı senkronize edildi.`);
+            showToastNotification(`Diğer bilgisayardan ${addedCount} yeni analiz kaydı canlı olarak aktarıldı.`);
           }
           return;
         }
       } catch(e) {
-        console.error("handleCloudSyncResponse error:", e);
+        console.error("handleCloudSyncResponse hatası:", e);
       }
 
+      setCloudStatusReady();
+    }
+
+    function setCloudStatusReady() {
+      isCloudSyncInProgress = false;
+      const icon = document.getElementById("cloudSyncHeaderIcon");
+      const text = document.getElementById("cloudSyncHeaderText");
+      const badge = document.getElementById("cloudSyncBadge");
+
       if (icon) icon.className = "fa-solid fa-cloud text-sky-400";
-      if (text) text.innerText = "Bulut Eşitle";
-      if (badge) badge.innerText = "Canlı";
+      if (text) text.innerText = "Bulut: Canlı (Firebase)";
+      if (badge) {
+        badge.className = "bg-emerald-600 text-white text-[9.5px] px-1.5 py-0.2 rounded font-bold shadow-xs";
+        badge.innerText = "Canlı";
+      }
     }
 
     function handleCloudSyncError(err, isUserInitiated) {
       isCloudSyncInProgress = false;
-      console.warn("Cloud sync warning:", err);
+      console.warn("Firebase bağlantı uyarısı:", err);
       const icon = document.getElementById("cloudSyncHeaderIcon");
       const text = document.getElementById("cloudSyncHeaderText");
       const badge = document.getElementById("cloudSyncBadge");
 
       if (icon) icon.className = "fa-solid fa-cloud text-amber-400";
-      if (text) text.innerText = "Bulut: Çevrimdışı";
+      if (text) text.innerText = "Bulut: Beklemede";
       if (badge) {
         badge.className = "bg-amber-600 text-white text-[9.5px] px-1.5 py-0.2 rounded font-bold";
         badge.innerText = "Yerel";
       }
 
       if (isUserInitiated) {
-        alert("Google Drive ortak veritabanına bağlanılamadı. Lütfen internet bağlantınızı ve Google Apps Script web linkinizi kontrol ediniz.");
+        const errStr = (err && err.message) ? err.message : String(err);
+        let detail = "Detay: " + errStr;
+        if (errStr.includes("401") || errStr.includes("403") || errStr.includes("Permission denied")) {
+          detail = "• FİREBASE VERİTABANI İZNİ GEREKİYOR.\n\n" +
+                   "ÇÖZÜM: Firebase Console > Realtime Database > Kurallar (Rules) sekmesine gidip read ve write değerlerini 'true' olarak kaydediniz.";
+        }
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Bulut senkronizasyonu uyarısı: " + errStr);
+        } else {
+          alert("Firebase Veritabanı Bağlantı Durumu:\n\n" + detail);
+        }
       }
     }
 
@@ -6044,10 +6182,8 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
       try { renderTableHeaders(); applyMasterTemplate(); } catch (e) { console.error("applyMasterTemplate error:", e); }
       try { onModalProductChange(); } catch (e) { console.error("onModalProductChange error:", e); }
       try { applyUserPermissionsToUI(); renderQuickUserSwitchMenu(); } catch(e) { console.error("applyUserPermissions error:", e); }
-      // Sayfa ilk açıldığında Google Drive'dan en güncel kayıtları sessizce çek
-      setTimeout(() => { syncWithCloudNow(false); }, 900);
-      // Her 45 saniyede bir arkada sessizce yeni kayıtları sorgula
-      setInterval(() => { syncWithCloudNow(false); }, 45000);
+      // Firebase Gerçek Zamanlı (Realtime) Canlı Dinleyiciyi Başlat
+      initFirebaseRealtime();
     }
 
     if (document.readyState === "loading") {
