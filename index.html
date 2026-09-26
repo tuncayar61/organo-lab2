@@ -101,12 +101,12 @@
       height: 34px !important;
     }
     #analysisTableBody tr td {
-      padding-top: 3px !important;
-      padding-bottom: 3px !important;
-      padding-left: 6px !important;
-      padding-right: 6px !important;
+      padding-top: 2px !important;
+      padding-bottom: 2px !important;
+      padding-left: 3px !important;
+      padding-right: 3px !important;
       font-size: 11px !important;
-      line-height: 1.2 !important;
+      line-height: 1.15 !important;
       vertical-align: middle !important;
       white-space: nowrap !important;
       border-bottom: 1px solid #e2e8f0 !important;
@@ -658,168 +658,168 @@
             
             <thead class="bg-slate-800 text-slate-100 sticky top-0 z-30 select-none shadow-sm">
               
-              <!-- 1. Satır: Parametre Etiketleri -->
-              <tr class="border-b border-slate-700" id="headerRowLabels">
+              <!-- 1. Satır: Parametre Etiketleri (Daraltılmış ve Optimize Edilmiş Kompakt Excel Genişlikleri) -->
+              <tr class="border-b border-slate-700 text-xs" id="headerRowLabels">
                 <!-- İŞLEMLER SÜTUNU: SOL BAŞA SABİTLENDİ -->
-                <th class="p-2 border-r border-slate-700 w-20 text-center font-bold sticky-actions-col shadow-sm" id="th_actions">
-                  <span class="text-[11px] uppercase tracking-wider">İŞLEM</span>
+                <th class="py-1 px-1 border-r border-slate-700 w-14 min-w-[56px] text-center font-bold sticky-actions-col shadow-sm" id="th_actions">
+                  <span class="text-[10px] uppercase tracking-wider">İŞLEM</span>
                 </th>
 
                 <!-- ID Sütunu -->
-                <th class="p-2 border-r border-slate-700 min-w-[70px] text-center font-bold col-id" id="th_id">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[48px] text-center font-bold col-id" id="th_id">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">ID</span>
-                    <button onclick="togglePin('col-id')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">ID</span>
+                    <button onclick="togglePin('col-id')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Tarih / Vardiya -->
-                <th class="p-2 border-r border-slate-700 min-w-[135px] col-tarih" id="th_tarih">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[105px] text-center col-tarih" id="th_tarih">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">Tarih / Vardiya</span>
-                    <button onclick="togglePin('col-tarih')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">Tarih / Vardiya</span>
+                    <button onclick="togglePin('col-tarih')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Numune Adı -->
-                <th class="p-2 border-r border-slate-700 min-w-[170px] col-urun" id="th_urun">
+                <th class="py-1.5 px-1.5 border-r border-slate-700 min-w-[130px] col-urun" id="th_urun">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">12-NUMUNE ADI</span>
-                    <button onclick="togglePin('col-urun')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">12-NUMUNE ADI</span>
+                    <button onclick="togglePin('col-urun')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Hat No -->
-                <th class="p-2 border-r border-slate-700 min-w-[90px] col-hat" id="th_hat">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[65px] text-center col-hat" id="th_hat">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">HAT NO</span>
-                    <button onclick="togglePin('col-hat')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">HAT NO</span>
+                    <button onclick="togglePin('col-hat')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Göz No -->
-                <th class="p-2 border-r border-slate-700 min-w-[100px] bg-indigo-950 col-goz" id="th_goz">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[65px] text-center bg-indigo-950 col-goz" id="th_goz">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">GÖZ NO</span>
-                    <button onclick="togglePin('col-goz')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">GÖZ NO</span>
+                    <button onclick="togglePin('col-goz')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Baz Seçimi -->
-                <th class="p-2 border-r border-slate-700 min-w-[95px] bg-teal-950 text-center col-baz" id="th_baz">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[58px] bg-teal-950 text-center col-baz" id="th_baz">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">10-BAZ</span>
-                    <button onclick="togglePin('col-baz')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">10-BAZ</span>
+                    <button onclick="togglePin('col-baz')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Analizi Yapan -->
-                <th class="p-2 border-r border-slate-700 min-w-[165px] bg-indigo-950 col-personel" id="th_personel">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[110px] text-center bg-indigo-950 col-personel" id="th_personel">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">11-ANALİZİ YAPAN</span>
-                    <button onclick="togglePin('col-personel')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">11-ANALİZİ YAPAN</span>
+                    <button onclick="togglePin('col-personel')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Parti No -->
-                <th class="p-2 border-r border-slate-700 min-w-[110px] col-parti" id="th_parti">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[80px] text-center col-parti" id="th_parti">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">Parti / Plaka</span>
-                    <button onclick="togglePin('col-parti')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">Parti/Plaka</span>
+                    <button onclick="togglePin('col-parti')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
 
                 <!-- Süreç -->
-                <th class="p-2 border-r border-slate-700 min-w-[110px] text-center col-surec" id="th_surec">
+                <th class="py-1.5 px-1 border-r border-slate-700 min-w-[75px] text-center col-surec" id="th_surec">
                   <div class="flex items-center justify-between">
-                    <span class="whitespace-nowrap font-bold">6-SÜREÇ</span>
-                    <button onclick="togglePin('col-surec')" title="İğnele / Sabitle" class="btn-pin text-[10px] p-0.5 text-slate-400 hover:text-amber-400">
+                    <span class="whitespace-nowrap font-bold text-[11px]">6-SÜREÇ</span>
+                    <button onclick="togglePin('col-surec')" title="İğnele / Sabitle" class="btn-pin text-[9px] p-0.5 text-slate-400 hover:text-amber-400">
                       <i class="fa-solid fa-thumbtack"></i>
                     </button>
                   </div>
                 </th>
                 
-                <!-- Sayısal Parametre Başlıkları (Temiz, Ferah ve Tamamen Okunaklı) -->
-                <th class="p-2 border-r border-slate-700 text-right bg-blue-950 min-w-[100px] col-azot" id="th_azot">
-                  <span class="whitespace-nowrap font-bold block">95-TOP. AZOT</span>
-                  <span id="badgeAzotBaz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <!-- Sayısal Parametre Başlıkları (Kompakt ve Daraltılmış) -->
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-blue-950 min-w-[75px] col-azot" id="th_azot">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">95-TOP. AZOT</span>
+                  <span id="badgeAzotBaz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-blue-950 min-w-[95px] col-nh4" id="th_nh4">
-                  <span class="whitespace-nowrap font-bold block">27-NH4-N</span>
-                  <span id="badgeNh4Baz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-blue-950 min-w-[68px] col-nh4" id="th_nh4">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">27-NH4-N</span>
+                  <span id="badgeNh4Baz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-blue-950 min-w-[95px] col-no3" id="th_no3">
-                  <span class="whitespace-nowrap font-bold block">28-NO3-N</span>
-                  <span id="badgeNo3Baz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-blue-950 min-w-[68px] col-no3" id="th_no3">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">28-NO3-N</span>
+                  <span id="badgeNo3Baz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-blue-950 min-w-[95px] col-ure" id="th_ure">
-                  <span class="whitespace-nowrap font-bold block">29-ÜRE-N</span>
-                  <span id="badgeUreBaz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-blue-950 min-w-[68px] col-ure" id="th_ure">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">29-ÜRE-N</span>
+                  <span id="badgeUreBaz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-emerald-950 min-w-[105px] col-p2o5" id="th_p2o5">
-                  <span class="whitespace-nowrap font-bold block">29-TOP. P2O5</span>
-                  <span id="badgeP2O5Baz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-emerald-950 min-w-[75px] col-p2o5" id="th_p2o5">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">29-TOP. P2O5</span>
+                  <span id="badgeP2O5Baz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-emerald-950 min-w-[100px] col-sudap" id="th_sudap">
-                  <span class="whitespace-nowrap font-bold block">31-SUDA P2O5</span>
-                  <span id="badgeSudaPBaz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-emerald-950 min-w-[70px] col-sudap" id="th_sudap">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">31-SUDA P2O5</span>
+                  <span id="badgeSudaPBaz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-amber-950 min-w-[95px] col-k2o" id="th_k2o">
-                  <span class="whitespace-nowrap font-bold block">40-TOP. K2O</span>
-                  <span id="badgeK2OBaz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-amber-950 min-w-[68px] col-k2o" id="th_k2o">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">40-TOP. K2O</span>
+                  <span id="badgeK2OBaz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-purple-950 min-w-[95px] col-so3" id="th_so3">
-                  <span class="whitespace-nowrap font-bold block">45-TOP. SO3</span>
-                  <span id="badgeSO3Baz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-purple-950 min-w-[68px] col-so3" id="th_so3">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">45-TOP. SO3</span>
+                  <span id="badgeSO3Baz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-purple-900 min-w-[95px] col-sudaso3" id="th_sudaso3">
-                  <span class="whitespace-nowrap font-bold block">46-SUDA ÇÖZ. SO3</span>
-                  <span id="badgeSudaSO3Baz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-purple-900 min-w-[72px] col-sudaso3" id="th_sudaso3">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">46-SUDA SO3</span>
+                  <span id="badgeSudaSO3Baz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(NİHAİ: KURU %)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-cyan-950 min-w-[85px] col-nem" id="th_nem">
-                  <span class="whitespace-nowrap font-bold block">58-NEM (%)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-cyan-950 min-w-[62px] col-nem" id="th_nem">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">58-NEM (%)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-cyan-950 min-w-[85px] col-om" id="th_om">
-                  <span class="whitespace-nowrap font-bold block">55-OM (TOC)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-cyan-950 min-w-[62px] col-om" id="th_om">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">55-OM (TOC)</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-cyan-950 min-w-[75px] col-ph" id="th_ph">
-                  <span class="whitespace-nowrap font-bold block">59-pH</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-cyan-950 min-w-[58px] col-ph" id="th_ph">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">59-pH</span>
                 </th>
 
-                <th class="p-2 border-r border-slate-700 text-right bg-rose-950 min-w-[90px] col-zn" id="th_zn">
-                  <span class="whitespace-nowrap font-bold block">103-Zn (%)</span>
-                  <span id="badgeZnBaz" class="block text-[9px] font-normal text-teal-300 whitespace-nowrap">(KURU %)</span>
+                <th class="py-1.5 px-1 border-r border-slate-700 text-center bg-rose-950 min-w-[65px] col-zn" id="th_zn">
+                  <span class="whitespace-nowrap font-bold block text-[11px]">103-Zn (%)</span>
+                  <span id="badgeZnBaz" class="block text-[8.5px] font-normal text-teal-300 whitespace-nowrap">(KURU %)</span>
                 </th>
 
-                <th class="p-2 min-w-[90px] text-center font-bold col-uygunluk" id="th_uygunluk">
-                  <span class="whitespace-nowrap">DURUM</span>
+                <th class="py-1.5 px-1 min-w-[72px] text-center font-bold col-uygunluk" id="th_uygunluk">
+                  <span class="whitespace-nowrap text-[11px]">DURUM</span>
                 </th>
               </tr>
 
@@ -1002,14 +1002,22 @@
                   </div>
                 </th>
 
-                <!-- OM Min -->
+                <!-- OM Min-Max -->
                 <th class="p-1 border-r border-slate-700 col-om">
-                  <input type="number" step="0.1" id="f_om_min" oninput="applyTableFilters()" placeholder="Min OM" class="excel-filter-input text-right">
+                  <div class="flex items-center space-x-0.5">
+                    <input type="number" step="0.1" id="f_om_min" oninput="applyTableFilters()" placeholder="Min" class="excel-filter-input text-right !p-0.5" title="Minimum OM (%)">
+                    <span class="text-slate-500">-</span>
+                    <input type="number" step="0.1" id="f_om_max" oninput="applyTableFilters()" placeholder="Max" class="excel-filter-input text-right !p-0.5" title="Maksimum OM (%)">
+                  </div>
                 </th>
 
-                <!-- pH Min -->
+                <!-- pH Min-Max -->
                 <th class="p-1 border-r border-slate-700 col-ph">
-                  <input type="number" step="0.1" id="f_ph_min" oninput="applyTableFilters()" placeholder="Min pH" class="excel-filter-input text-right">
+                  <div class="flex items-center space-x-0.5">
+                    <input type="number" step="0.1" id="f_ph_min" oninput="applyTableFilters()" placeholder="Min" class="excel-filter-input text-right !p-0.5" title="Minimum pH">
+                    <span class="text-slate-500">-</span>
+                    <input type="number" step="0.1" id="f_ph_max" oninput="applyTableFilters()" placeholder="Max" class="excel-filter-input text-right !p-0.5" title="Maksimum pH">
+                  </div>
                 </th>
 
                 <!-- Zn Min-Max -->
@@ -1075,7 +1083,7 @@
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <button type="button" onclick="openTableModifierModal()" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-purple-400/30 cursor-pointer" title="Şablonu ve Form Alanlarını Modifiye Et (Always Hidden, Sıralama, Yeni Alanlar)">
+          <button type="button" onclick="openTableModifierModal()" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-purple-400/30 cursor-pointer" title="Şablonu ve Form Alanlarını Modifiye Et" tabindex="-1">
             <i class="fa-solid fa-shapes text-purple-300"></i>
             <span>Şablonu Modifiye Et</span>
           </button>
@@ -1101,7 +1109,7 @@
             <div class="flex items-center space-x-3">
               <!-- Zorunlu Alan Kontrolü Seçeneği -->
               <label class="flex items-center space-x-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-300 hover:border-amber-400 transition shadow-2xs select-none" title="Tüm veri girişlerinde zorunlu alan kurallarını uygula">
-                <input type="checkbox" id="toggleRequiredFieldsModal" onchange="toggleRequiredValidation(this.checked)" class="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer">
+                <input type="checkbox" id="toggleRequiredFieldsModal" tabindex="-1" onchange="toggleRequiredValidation(this.checked)" class="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer">
                 <span class="font-bold text-[11px] text-slate-700 flex items-center space-x-1">
                   <i class="fa-solid fa-shield-halved text-amber-500"></i>
                   <span>Zorunlu Alan Kontrolü</span>
@@ -1112,10 +1120,10 @@
               <div id="field_box_baz" class="flex items-center space-x-2">
                 <span class="font-bold text-slate-700">10-Nihai Sonuç Bazı:</span>
                 <div class="inline-flex rounded-lg border border-slate-300 p-0.5 bg-white shadow-sm">
-                  <button type="button" id="btnModalBazYas" onclick="setModalBaz('YAŞ')" class="px-3 py-1 rounded font-bold transition text-xs bg-slate-200 text-slate-700">
+                  <button type="button" id="btnModalBazYas" tabindex="-1" onclick="setModalBaz('YAŞ')" class="px-3 py-1 rounded font-bold transition text-xs bg-slate-200 text-slate-700">
                     YAŞ BAZ
                   </button>
-                  <button type="button" id="btnModalBazKuru" onclick="setModalBaz('KURU')" class="px-3 py-1 rounded font-extrabold transition text-xs bg-teal-300 text-black shadow border border-teal-500">
+                  <button type="button" id="btnModalBazKuru" tabindex="-1" onclick="setModalBaz('KURU')" class="px-3 py-1 rounded font-extrabold transition text-xs bg-teal-300 text-black shadow border border-teal-500">
                     KURU BAZ
                   </button>
                 </div>
@@ -1133,11 +1141,11 @@
                   <span class="text-rose-500 font-bold req-star req-star-urun hidden">*</span>
                 </label>
                 <div class="flex items-center space-x-1.5">
-                  <button type="button" onclick="quickAddMasterItem('urun')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Gübre Kartı Ekle">+ Yeni</button>
-                  <button type="button" onclick="editCurrentProductCard()" class="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1 transition shadow-2xs" title="Seçili Gübrenin Kartını ve Değerlerini Güncelle">
+                  <button type="button" onclick="quickAddMasterItem('urun')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Gübre Kartı Ekle" tabindex="-1">+ Yeni</button>
+                  <button type="button" onclick="editCurrentProductCard()" class="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1 transition shadow-2xs" title="Seçili Gübrenin Kartını ve Değerlerini Güncelle" tabindex="-1">
                     <i class="fa-solid fa-pen-to-square text-[9.5px]"></i> <span>Kartı Düzenle</span>
                   </button>
-                  <button type="button" onclick="openFieldConfigPopover('urun', '12-Numune / Ürün Adı', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                  <button type="button" onclick="openFieldConfigPopover('urun', '12-Numune / Ürün Adı', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                     <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                   </button>
                 </div>
@@ -1154,7 +1162,7 @@
                   <span>Numune Türü</span>
                   <span class="text-rose-500 font-bold req-star req-star-tur hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('tur', 'Numune Türü', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('tur', 'Numune Türü', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1173,8 +1181,8 @@
                   <span class="text-rose-500 font-bold req-star req-star-hat hidden">*</span>
                 </label>
                 <div class="flex items-center space-x-1">
-                  <button type="button" onclick="quickAddMasterItem('hat')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Hat Ekle">+ Yeni</button>
-                  <button type="button" onclick="openFieldConfigPopover('hat', 'Hat No', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                  <button type="button" onclick="quickAddMasterItem('hat')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Hat Ekle" tabindex="-1">+ Yeni</button>
+                  <button type="button" onclick="openFieldConfigPopover('hat', 'Hat No', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                     <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                   </button>
                 </div>
@@ -1192,8 +1200,8 @@
                   <span class="text-rose-500 font-bold req-star req-star-goz hidden">*</span>
                 </label>
                 <div class="flex items-center space-x-1">
-                  <button type="button" onclick="quickAddMasterItem('goz')" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline" title="Yeni Göz Ekle">+ Yeni</button>
-                  <button type="button" onclick="openFieldConfigPopover('goz', 'Göz No (Silo)', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                  <button type="button" onclick="quickAddMasterItem('goz')" class="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline" title="Yeni Göz Ekle" tabindex="-1">+ Yeni</button>
+                  <button type="button" onclick="openFieldConfigPopover('goz', 'Göz No (Silo)', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                     <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                   </button>
                 </div>
@@ -1214,8 +1222,8 @@
                   <span class="text-rose-500 font-bold req-star req-star-vardiya hidden">*</span>
                 </label>
                 <div class="flex items-center space-x-1">
-                  <button type="button" onclick="quickAddMasterItem('vardiya')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Vardiya Ekle">+ Yeni</button>
-                  <button type="button" onclick="openFieldConfigPopover('vardiya', 'Vardiya', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                  <button type="button" onclick="quickAddMasterItem('vardiya')" class="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline" title="Yeni Vardiya Ekle" tabindex="-1">+ Yeni</button>
+                  <button type="button" onclick="openFieldConfigPopover('vardiya', 'Vardiya', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                     <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                   </button>
                 </div>
@@ -1232,7 +1240,7 @@
                   <span>Parti / Plaka No</span>
                   <span class="text-rose-500 font-bold req-star req-star-parti hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('parti', 'Parti / Plaka No', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('parti', 'Parti / Plaka No', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1246,7 +1254,7 @@
                   <span>Analiz Tarihi / Saati</span>
                   <span class="text-rose-500 font-bold req-star req-star-tarih hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('tarih', 'Analiz Tarihi / Saati', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('tarih', 'Analiz Tarihi / Saati', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1260,7 +1268,7 @@
                   <span>6-Süreç Durumu</span>
                   <span class="text-rose-500 font-bold req-star req-star-surec hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('surec', '6-Süreç Durumu', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('surec', '6-Süreç Durumu', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1283,7 +1291,7 @@
                 <button type="button" onclick="quickAddMasterItem('personel')" class="text-[10px] text-indigo-700 hover:text-indigo-900 font-bold hover:underline flex items-center gap-1 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
                   <i class="fa-solid fa-user-plus text-indigo-600"></i> + Yeni Personel
                 </button>
-                <button type="button" onclick="openFieldConfigPopover('personel', '11-Analizi Yapan Personel', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('personel', '11-Analizi Yapan Personel', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1324,7 +1332,7 @@
                   <span>58-Nem (%)</span>
                   <span class="text-rose-500 font-bold req-star req-star-nem hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('nem', '58-Nem (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('nem', '58-Nem (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1336,11 +1344,11 @@
                   <span>54-KM (%)</span>
                   <span class="text-rose-500 font-bold req-star req-star-km hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('km', '54-KM (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('km', '54-KM (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
-              <input type="text" id="m_km" readonly class="w-full p-1.5 border border-slate-300 rounded bg-slate-100 font-bold text-slate-700">
+              <input type="text" id="m_km" readonly tabindex="-1" class="w-full p-1.5 border border-slate-300 rounded bg-slate-100 font-bold text-slate-700">
             </div>
             <div id="field_box_ph">
               <div class="flex justify-between items-center mb-1">
@@ -1348,7 +1356,7 @@
                   <span>59-pH</span>
                   <span class="text-rose-500 font-bold req-star req-star-ph hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('ph', '59-pH', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('ph', '59-pH', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1360,7 +1368,7 @@
                   <span>55-OM (TOC) (%)</span>
                   <span class="text-rose-500 font-bold req-star req-star-om hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('om', '55-OM (TOC) (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('om', '55-OM (TOC) (%)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -1384,7 +1392,7 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="openProductNitrogenConfigModal()" class="text-[10.5px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-2.5 py-1 rounded-md border border-blue-300 flex items-center gap-1.5 transition shadow-2xs" title="Bu gübrenin içerdiği azot türevlerini (Amonyum, Nitrat, Üre vb.) belirle">
+              <button type="button" onclick="openProductNitrogenConfigModal()" class="text-[10.5px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-2.5 py-1 rounded-md border border-blue-300 flex items-center gap-1.5 transition shadow-2xs" title="Bu gübrenin içerdiği azot türevlerini (Amonyum, Nitrat, Üre vb.) belirle" tabindex="-1">
                 <i class="fa-solid fa-sliders text-xs"></i> <span>Azot Türevlerini Belirle</span>
               </button>
             </div>
@@ -1414,7 +1422,7 @@
                 </div>
                 <div class="flex items-center space-x-1">
                   <span class="text-[11px] font-bold text-teal-800">Nihai <span id="txtModalAzotBazBadge" class="text-[10px] text-teal-700">(KURU %)</span>:</span>
-                  <input type="text" inputmode="decimal" id="m_top_azot_nihai" readonly placeholder="0.00" class="w-20 p-1 border border-blue-400 rounded bg-blue-100 font-black text-blue-950 text-xs text-center shadow-2xs">
+                  <input type="text" inputmode="decimal" id="m_top_azot_nihai" readonly tabindex="-1" placeholder="0.00" class="w-20 p-1 border border-blue-400 rounded bg-blue-100 font-black text-blue-950 text-xs text-center shadow-2xs">
                 </div>
               </div>
             </div>
@@ -1440,7 +1448,7 @@
                       <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
                       27-Amonyum Azotu (NH₄-N)
                     </span>
-                    <button type="button" onclick="openFieldConfigPopover('nh4N', 'Amonyum Azotu (NH4-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" title="Alan Ayarları">
+                    <button type="button" onclick="openFieldConfigPopover('nh4N', 'Amonyum Azotu (NH4-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" tabindex="-1" title="Alan Ayarları">
                       <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
                     </button>
                   </div>
@@ -1465,7 +1473,7 @@
                     </div>
                     <div>
                       <label class="block text-[9.5px] font-bold text-teal-800 mb-0.5">Nihai (%):</label>
-                      <input type="text" inputmode="decimal" id="m_nh4_nihai" readonly placeholder="0.00" class="w-full p-1 border border-blue-300 rounded text-xs font-black text-blue-950 bg-blue-100 text-center">
+                      <input type="text" inputmode="decimal" id="m_nh4_nihai" readonly tabindex="-1" placeholder="0.00" class="w-full p-1 border border-blue-300 rounded text-xs font-black text-blue-950 bg-blue-100 text-center">
                     </div>
                   </div>
                 </div>
@@ -1479,7 +1487,7 @@
                       <span class="w-2 h-2 rounded-full bg-cyan-500 inline-block"></span>
                       28-Nitrat Azotu (NO₃-N)
                     </span>
-                    <button type="button" onclick="openFieldConfigPopover('no3N', 'Nitrat Azotu (NO3-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" title="Alan Ayarları">
+                    <button type="button" onclick="openFieldConfigPopover('no3N', 'Nitrat Azotu (NO3-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" tabindex="-1" title="Alan Ayarları">
                       <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
                     </button>
                   </div>
@@ -1504,7 +1512,7 @@
                     </div>
                     <div>
                       <label class="block text-[9.5px] font-bold text-teal-800 mb-0.5">Nihai (%):</label>
-                      <input type="text" inputmode="decimal" id="m_no3_nihai" readonly placeholder="0.00" class="w-full p-1 border border-cyan-300 rounded text-xs font-black text-blue-950 bg-cyan-100 text-center">
+                      <input type="text" inputmode="decimal" id="m_no3_nihai" readonly tabindex="-1" placeholder="0.00" class="w-full p-1 border border-cyan-300 rounded text-xs font-black text-blue-950 bg-cyan-100 text-center">
                     </div>
                   </div>
                 </div>
@@ -1518,7 +1526,7 @@
                       <span class="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
                       29-Üre Azotu (Üre-N)
                     </span>
-                    <button type="button" onclick="openFieldConfigPopover('ureN', 'Üre Azotu (Üre-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" title="Alan Ayarları">
+                    <button type="button" onclick="openFieldConfigPopover('ureN', 'Üre Azotu (Üre-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" tabindex="-1" title="Alan Ayarları">
                       <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
                     </button>
                   </div>
@@ -1543,7 +1551,7 @@
                     </div>
                     <div>
                       <label class="block text-[9.5px] font-bold text-teal-800 mb-0.5">Nihai (%):</label>
-                      <input type="text" inputmode="decimal" id="m_ure_nihai" readonly placeholder="0.00" class="w-full p-1 border border-indigo-300 rounded text-xs font-black text-blue-950 bg-indigo-100 text-center">
+                      <input type="text" inputmode="decimal" id="m_ure_nihai" readonly tabindex="-1" placeholder="0.00" class="w-full p-1 border border-indigo-300 rounded text-xs font-black text-blue-950 bg-indigo-100 text-center">
                     </div>
                   </div>
                 </div>
@@ -1557,7 +1565,7 @@
                       <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
                       Organik Azot (Org-N)
                     </span>
-                    <button type="button" onclick="openFieldConfigPopover('orgN', 'Organik Azot (Org-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" title="Alan Ayarları">
+                    <button type="button" onclick="openFieldConfigPopover('orgN', 'Organik Azot (Org-N)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded" tabindex="-1" title="Alan Ayarları">
                       <i class="fa-solid fa-ellipsis-vertical text-[10px]"></i>
                     </button>
                   </div>
@@ -1615,12 +1623,12 @@
                   <span>29-Top. P2O5</span>
                   <span class="text-rose-500 font-bold req-star req-star-topP2O5 hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('topP2O5', '29-Toplam P2O5', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('topP2O5', '29-Toplam P2O5', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_top_p2o5_yas" placeholder="0,00" oninput="onYasInputChanged('topP2O5', this.value)" class="w-full p-1.5 border border-emerald-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-emerald-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_p2o5_nihai" readonly class="w-16 p-0.5 bg-emerald-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-emerald-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_p2o5_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-emerald-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
             <!-- Suda Çözünür P2O5 -->
@@ -1630,12 +1638,12 @@
                   <span>31-Suda P2O5</span>
                   <span class="text-rose-500 font-bold req-star req-star-sudaP2O5 hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('sudaP2O5', '31-Suda Çözünür P2O5', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('sudaP2O5', '31-Suda Çözünür P2O5', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_suda_p2o5_yas" placeholder="0,00" oninput="onYasInputChanged('sudaP2O5', this.value)" class="w-full p-1.5 border border-emerald-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-emerald-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_suda_p2o5_nihai" readonly class="w-16 p-0.5 bg-emerald-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-emerald-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_suda_p2o5_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-emerald-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
             <!-- Top. K2O -->
@@ -1645,12 +1653,12 @@
                   <span>40-Suda Çözünür K2O</span>
                   <span class="text-rose-500 font-bold req-star req-star-topK2O hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('topK2O', '40-Suda Çözünür K2O', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('topK2O', '40-Suda Çözünür K2O', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_top_k2o_yas" placeholder="0,00" oninput="onYasInputChanged('topK2O', this.value)" class="w-full p-1.5 border border-amber-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-amber-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_k2o_nihai" readonly class="w-16 p-0.5 bg-amber-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-amber-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_k2o_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-amber-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
             <!-- Top. SO3 -->
@@ -1660,12 +1668,12 @@
                   <span>45-Top. SO3</span>
                   <span class="text-rose-500 font-bold req-star req-star-topSO3 hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('topSO3', '45-Toplam SO3', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('topSO3', '45-Toplam SO3', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_top_so3_yas" placeholder="0,00" oninput="onYasInputChanged('topSO3', this.value)" class="w-full p-1.5 border border-purple-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-purple-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_so3_nihai" readonly class="w-16 p-0.5 bg-purple-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-purple-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_top_so3_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-purple-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
             <!-- Suda Çöz. SO3 -->
@@ -1675,12 +1683,12 @@
                   <span>46-Suda Çöz. SO3</span>
                   <span class="text-rose-500 font-bold req-star req-star-sudaSO3 hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('sudaSO3', '46-Suda Çözünür SO3', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('sudaSO3', '46-Suda Çözünür SO3', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_suda_so3_yas" placeholder="0,00" oninput="onYasInputChanged('sudaSO3', this.value)" class="w-full p-1.5 border border-purple-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-purple-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_suda_so3_nihai" readonly class="w-16 p-0.5 bg-purple-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-purple-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_suda_so3_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-purple-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
             <!-- Zn (%) -->
@@ -1690,12 +1698,12 @@
                   <span>103-Zn (%)</span>
                   <span class="text-rose-500 font-bold req-star req-star-zn hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('zn', '103-Çinko (Zn)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('zn', '103-Çinko (Zn)', event)" class="field-settings-btn p-0.5 text-slate-400 hover:text-slate-800 rounded transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
               <input type="text" inputmode="decimal" id="m_zn_yas" placeholder="0,000" oninput="onYasInputChanged('zn', this.value)" class="w-full p-1.5 border border-rose-300 rounded bg-white font-semibold">
-              <span class="block text-[10px] text-rose-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_zn_nihai" readonly class="w-16 p-0.5 bg-rose-100 rounded text-right font-bold inline border-0"></span>
+              <span class="block text-[10px] text-rose-700 mt-0.5 font-bold">Nihai: <input type="text" id="m_zn_nihai" readonly tabindex="-1" class="w-16 p-0.5 bg-rose-100 rounded text-right font-bold inline border-0"></span>
             </div>
 
           </div>
@@ -1710,7 +1718,7 @@
                   <span>Kalite Uygunluk Durumu</span>
                   <span class="text-rose-500 font-bold req-star req-star-uygunluk hidden">*</span>
                 </label>
-                <button type="button" onclick="openFieldConfigPopover('uygunluk', 'Kalite Uygunluk Durumu', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+                <button type="button" onclick="openFieldConfigPopover('uygunluk', 'Kalite Uygunluk Durumu', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
                   <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
                 </button>
               </div>
@@ -6220,6 +6228,7 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
       try { applyUserPermissionsToUI(); renderQuickUserSwitchMenu(); } catch(e) { console.error("applyUserPermissions error:", e); }
       // Firebase Gerçek Zamanlı (Realtime) Canlı Dinleyiciyi Başlat
       initFirebaseRealtime();
+      setupEntryModalSmartNavigation();
     }
 
     if (document.readyState === "loading") {
@@ -7826,7 +7835,7 @@ function renderDataCellHtml(row, f) {
 
         let cellsHtml = `
           <!-- SOL BAŞA SABİTLENMİŞ İŞLEM SÜTUNU (YETKİYE GÖRE DİNAMİK) -->
-          <td class="py-1 px-1 border-r border-slate-200 text-center sticky-actions-col bg-white min-w-[78px] whitespace-nowrap">
+          <td class="py-1 px-1 border-r border-slate-200 text-center sticky-actions-col bg-white min-w-[56px] whitespace-nowrap">
             <div class="flex items-center justify-center space-x-1 flex-nowrap">
               ${actionButtonsHtml}
             </div>
@@ -8204,7 +8213,64 @@ function renderDataCellHtml(row, f) {
       }).join("");
     }
 
-function openModalForNew() {
+
+    // ========================================================
+    // AKILLI TAB VE ENTER İLE VERİ GİRİŞ KUTULARI ARASINDA GEÇİŞ
+    // ========================================================
+    function setupEntryModalSmartNavigation() {
+      const modal = document.getElementById("entryModal");
+      if (!modal) return;
+
+      modal.addEventListener("keydown", function(e) {
+        // 1. TAB VE SHIFT+TAB İLE SADECE VERİ GİRİŞ KUTULARI ARASINDA GEÇİŞ
+        if (e.key === "Tab") {
+          const focusable = Array.from(modal.querySelectorAll(
+            "input:not([type='hidden']):not([readonly]):not([disabled]):not([tabindex='-1']), " +
+            "select:not([disabled]):not([tabindex='-1']), " +
+            "textarea:not([readonly]):not([disabled]):not([tabindex='-1']), " +
+            "#btnSaveRecord, #btnCancelRecord"
+          )).filter(el => el.offsetParent !== null); // Sadece ekranda görünür olan alanlar
+
+          if (focusable.length === 0) return;
+
+          const current = document.activeElement;
+          let index = focusable.indexOf(current);
+
+          e.preventDefault();
+          let nextIndex = e.shiftKey ? index - 1 : index + 1;
+          if (nextIndex >= focusable.length) nextIndex = 0;
+          if (nextIndex < 0) nextIndex = focusable.length - 1;
+
+          focusable[nextIndex].focus();
+          if (typeof focusable[nextIndex].select === "function" && focusable[nextIndex].tagName === "INPUT" && focusable[nextIndex].type !== "checkbox") {
+            focusable[nextIndex].select();
+          }
+        } 
+        // 2. ENTER TUŞU İLE BİR SONRAKİ VERİ GİRİŞ KUTUSUNA HIZLI GEÇİŞ (LABORANT KONFORU)
+        else if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "submit" && e.target.type !== "button" && e.target.type !== "checkbox") {
+          e.preventDefault();
+          const focusable = Array.from(modal.querySelectorAll(
+            "input:not([type='hidden']):not([readonly]):not([disabled]):not([tabindex='-1']), " +
+            "select:not([disabled]):not([tabindex='-1']), " +
+            "textarea:not([readonly]):not([disabled]):not([tabindex='-1'])"
+          )).filter(el => el.offsetParent !== null);
+
+          const index = focusable.indexOf(e.target);
+          if (index !== -1 && index + 1 < focusable.length) {
+            focusable[index + 1].focus();
+            if (typeof focusable[index + 1].select === "function" && focusable[index + 1].type !== "checkbox") {
+              focusable[index + 1].select();
+            }
+          } else {
+            // Son veri kutusundaysa doğrudan Kaydet butonuna odaklan
+            const btnSave = document.getElementById("btnSaveRecord");
+            if (btnSave) btnSave.focus();
+          }
+        }
+      });
+    }
+
+    function openModalForNew() {
       if (!hasPermission("canCreateRecord")) {
         if (typeof showToastNotification === "function") showToastNotification("Yeni veri girişi yetkiniz bulunmamaktadır.");
         return;
@@ -9063,7 +9129,9 @@ function openModalForNew() {
       const nemMin = getFilterNum("f_nem_min", -Infinity);
       const nemMax = getFilterNum("f_nem_max", Infinity);
       const omMin = getFilterNum("f_om_min", -Infinity);
+      const omMax = getFilterNum("f_om_max", Infinity);
       const phMin = getFilterNum("f_ph_min", -Infinity);
+      const phMax = getFilterNum("f_ph_max", Infinity);
       const znMin = getFilterNum("f_zn_min", -Infinity);
       const znMax = getFilterNum("f_zn_max", Infinity);
 
@@ -9112,8 +9180,21 @@ function openModalForNew() {
         if (sudaSO3Val < sudaSO3Min || sudaSO3Val > sudaSO3Max) return false;
         if (sudaSO3Val < sudaSO3Min || sudaSO3Val > sudaSO3Max) return false;
         if (row.nem < nemMin || row.nem > nemMax) return false;
-        if (row.om < omMin) return false;
-        if (row.ph < phMin) return false;
+        
+        const omVal = parseFloat(row.om);
+        if (!isNaN(omVal)) {
+          if (omVal < omMin || omVal > omMax) return false;
+        } else if (omMin !== -Infinity) {
+          return false;
+        }
+
+        const phVal = (typeof row.ph === "number") ? row.ph : parseTRNumber(row.ph);
+        if (!isNaN(phVal) && phVal > 0) {
+          if (phVal < phMin || phVal > phMax) return false;
+        } else if (phMin !== -Infinity) {
+          return false;
+        }
+
         if (znVal < znMin || znVal > znMax) return false;
 
         return true;
@@ -9198,7 +9279,9 @@ function openModalForNew() {
       setFilterVal("f_nem_min", "");
       setFilterVal("f_nem_max", "");
       setFilterVal("f_om_min", "");
+      setFilterVal("f_om_max", "");
       setFilterVal("f_ph_min", "");
+      setFilterVal("f_ph_max", "");
       setFilterVal("f_zn_min", "");
       setFilterVal("f_zn_max", "");
 
@@ -12008,7 +12091,7 @@ function openModalForNew() {
               <span>${cf.label}</span>
               ${reqStar}
             </label>
-            <button type="button" onclick="openFieldConfigPopover('${cf.key}', '${cf.label}', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" title="Alan Ayarları">
+            <button type="button" onclick="openFieldConfigPopover('${cf.key}', '${cf.label}', event)" class="field-settings-btn p-1 text-slate-400 hover:text-slate-800 rounded hover:bg-slate-200 transition" tabindex="-1" title="Alan Ayarları">
               <i class="fa-solid fa-ellipsis-vertical text-xs"></i>
             </button>
           </div>
