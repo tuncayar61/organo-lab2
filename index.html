@@ -306,10 +306,7 @@
           <span>Filtreleri Temizle</span>
         </button>
 
-        <button onclick="openModalForNew()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 shadow transition">
-          <i class="fa-solid fa-plus"></i>
-          <span>Yeni Veri Girişi</span>
-        </button>
+
 
         <button onclick="openTableModifierModal()" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition">
           <i class="fa-solid fa-shapes text-purple-300"></i>
@@ -474,6 +471,13 @@
             </div>
           </div>
         </div>
+
+        <!-- EN SAĞA SABİTLENMİŞ YENİ KAYIT GİRİŞİ BUTONU -->
+        <button onclick="openModalForNew()" id="btnHeaderNewEntry" class="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-4 py-2 rounded-xl text-xs font-extrabold flex items-center space-x-2 shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/30 transition-all border border-emerald-400/50 cursor-pointer flex-shrink-0 tracking-wide ring-2 ring-emerald-500/20 active:scale-95" title="F7.5-0-1 Yeni Analiz Kaydı Giriş Formunu Aç">
+          <i class="fa-solid fa-plus-circle text-sm text-emerald-100"></i>
+          <span>Yeni Kayıt Girişi</span>
+        </button>
+
 
       </div>
     </div>
@@ -1056,8 +1060,8 @@
   </div>
 
   <!-- 1. MODAL: DETAYLI VERİ GİRİŞİ / DÜZENLEME EKRANI -->
-  <div id="entryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden" style="display: none;">
-    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[94vh] flex flex-col overflow-hidden border border-slate-200">
+  <div id="entryModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-2 sm:p-4 pt-2 sm:pt-4 overflow-y-auto hidden" style="display: none;">
+    <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col overflow-hidden border border-slate-200 mt-1 sm:mt-2 mb-4">
       
       <!-- Modal Başlık -->
       <div class="px-6 py-3.5 bg-slate-900 text-white flex justify-between items-center">
@@ -1082,7 +1086,7 @@
       </div>
 
       <!-- Modal İçerik / Form -->
-      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+      <div id="entryModalBody" class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
         
         <!-- Doğrulama / Eksik Alan Uyarısı -->
         <div id="modalValidationAlert" class="hidden bg-rose-50 border-2 border-rose-400 text-rose-900 p-3 rounded-xl shadow-xs mb-2 animate-in fade-in duration-200"></div>
@@ -8313,6 +8317,17 @@ function openModalForNew() {
         if (modalEl) {
           modalEl.classList.remove("hidden");
           modalEl.style.display = "flex";
+          modalEl.scrollTop = 0;
+          const modalBody = document.getElementById("entryModalBody") || modalEl.querySelector(".overflow-y-auto");
+          if (modalBody) modalBody.scrollTop = 0;
+          setTimeout(() => {
+            modalEl.scrollTop = 0;
+            if (modalBody) modalBody.scrollTop = 0;
+            const firstInput = document.getElementById("modalTarih") || document.getElementById("modalProduct");
+            if (firstInput) {
+              try { firstInput.focus({ preventScroll: true }); } catch(e) {}
+            }
+          }, 30);
         }
       } catch (err) {
         console.error("openModalForNew error:", err);
@@ -8425,6 +8440,17 @@ function openModalForNew() {
         if (modalEl) {
           modalEl.classList.remove("hidden");
           modalEl.style.display = "flex";
+          modalEl.scrollTop = 0;
+          const modalBody = document.getElementById("entryModalBody") || modalEl.querySelector(".overflow-y-auto");
+          if (modalBody) modalBody.scrollTop = 0;
+          setTimeout(() => {
+            modalEl.scrollTop = 0;
+            if (modalBody) modalBody.scrollTop = 0;
+            const firstInput = document.getElementById("modalTarih") || document.getElementById("modalProduct");
+            if (firstInput) {
+              try { firstInput.focus({ preventScroll: true }); } catch(e) {}
+            }
+          }, 30);
         }
       } catch (err) {
         console.error("editInModal error:", err);
@@ -8787,6 +8813,27 @@ function openModalForNew() {
           if (mZnY) mZnY.value = "";
           const mZnN = document.getElementById("m_zn_nihai");
           if (mZnN) mZnN.value = "";
+        }
+      }
+
+      // 4. pH KONTROLÜ (Ürün kartında seçime bağlı dinamik kontrol)
+      const fBoxPH = document.getElementById("field_box_ph");
+      if (fBoxPH) {
+        const prodCard = (PRODUCT_CARDS && PRODUCT_CARDS[prod]) ? PRODUCT_CARDS[prod] : null;
+        if (prodCard && prodCard.hasPh !== undefined) {
+          if (prodCard.hasPh) {
+            fBoxPH.classList.remove("hidden");
+            const mPh = document.getElementById("m_ph");
+            if (mPh && prodCard.ph) {
+              mPh.placeholder = (typeof prodCard.ph === "number") ? formatTRNumber(prodCard.ph, 1) : prodCard.ph;
+            }
+          } else {
+            fBoxPH.classList.add("hidden");
+            const mPh = document.getElementById("m_ph");
+            if (mPh) mPh.value = "";
+          }
+        } else {
+          fBoxPH.classList.remove("hidden");
         }
       }
 
@@ -9676,6 +9723,8 @@ function openModalForNew() {
         targetUre: 0,
         hasOrgN: false,
         targetOrgN: 0,
+        hasPh: false,
+        ph: 0,
         note: ""
       };
 
@@ -9827,6 +9876,8 @@ function openModalForNew() {
           targetUre: 0,
           hasOrgN: false,
           targetOrgN: 0,
+          hasPh: false,
+          ph: 0,
           note: ""
         };
         if (titleEl) titleEl.innerText = "Yeni Gübre / Ürün Kartı Ekle";
@@ -9868,6 +9919,15 @@ function openModalForNew() {
       setChk("pc_has_zn", !!data.hasZn);
       setNum("pc_zn", (data.hasZn && data.zn > 0) ? data.zn : 0, 3);
       setNum("pc_om", data.om, 1);
+      setChk("pc_has_ph", !!data.hasPh);
+      const elPh = document.getElementById("pc_ph");
+      if (elPh) {
+        if (data.hasPh && data.ph !== undefined && data.ph !== null && data.ph !== "") {
+          elPh.value = (typeof data.ph === "number" && data.ph > 0) ? formatTRNumber(data.ph, 1) : data.ph;
+        } else {
+          elPh.value = "";
+        }
+      }
       setVal("pc_note", data.note || "");
 
       // Azot Türevleri (Virgüllü % Değerleri)
@@ -9984,7 +10044,7 @@ function openModalForNew() {
       toggleField("pc_has_org", "pc_target_org");
       toggleField("pc_has_zn", "pc_zn");
       toggleField("pc_has_suda_so3", "pc_suda_so3");
-      toggleField("pc_has_suda_so3", "pc_suda_so3");
+      toggleField("pc_has_ph", "pc_ph");
     }
 
     function recalculateProductCardTotalNitrogen() {
@@ -10072,6 +10132,8 @@ function openModalForNew() {
         targetUre: parseTRNumber(document.getElementById("pc_target_ure")?.value),
         hasOrgN: hasOrg,
         targetOrgN: parseTRNumber(document.getElementById("pc_target_org")?.value),
+        hasPh: document.getElementById("pc_has_ph")?.checked || false,
+        ph: (document.getElementById("pc_has_ph")?.checked) ? ((parseTRNumber(document.getElementById("pc_ph")?.value) > 0) ? parseTRNumber(document.getElementById("pc_ph")?.value) : (document.getElementById("pc_ph")?.value?.trim() || 0)) : 0,
         note: document.getElementById("pc_note")?.value || ""
       };
 
@@ -13042,6 +13104,18 @@ function openModalForNew() {
             <div class="bg-white p-2.5 rounded-lg border border-slate-200">
               <label class="block text-[11px] font-bold text-slate-700 mb-1">55-Organik Madde (%):</label>
               <input type="text" inputmode="decimal" id="pc_om" placeholder="0.0" class="w-full p-1.5 border border-slate-300 rounded text-xs font-bold text-teal-950">
+            </div>
+
+            <!-- 59-pH Değeri (Seçime Bağlı) -->
+            <div class="bg-white p-2.5 rounded-lg border border-cyan-200 shadow-2xs">
+              <div class="flex items-center justify-between mb-1">
+                <label class="flex items-center space-x-1.5 cursor-pointer" title="Bu ürün için pH parametresini aktif et / seçime bağla">
+                  <input type="checkbox" id="pc_has_ph" onchange="updateProductCardUIStates()" class="rounded text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5 cursor-pointer">
+                  <span class="text-[11px] font-bold text-cyan-950">59-pH Değeri</span>
+                </label>
+                <span class="text-[9px] text-cyan-700 font-bold bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200">Seçime Bağlı</span>
+              </div>
+              <input type="text" inputmode="decimal" id="pc_ph" placeholder="Örn: 7,0 veya 6,5-7,5" class="w-full p-1.5 border border-cyan-300 rounded text-xs font-bold text-cyan-950 transition">
             </div>
           </div>
         </div>
