@@ -4571,9 +4571,16 @@
     const FIREBASE_BASE_URL = "https://organo-lab-default-rtdb.firebaseio.com";
     const FIREBASE_ENDPOINT = "https://organo-lab-default-rtdb.firebaseio.com/lab_master_store.json";
     
+    // =========================================================================
+    // OTORİTER MASTER MODELİ (EN SON GÜNCELLEYEN BİLGİSAYAR ESASTIR & SIFIR GECİKME)
+    // =========================================================================
+    const ERP_CLIENT_INSTANCE_ID = "client_" + Date.now() + "_" + Math.random().toString(36).substring(2, 9);
     let cloudSyncDebounceTimer = null;
     let isCloudSyncInProgress = false;
+    let isApplyingRemoteCloudSync = false;
     let firebaseSseSource = null;
+    let lastLocalMutationTime = parseInt(SafeStorage.getItem("LAB_ERP_LAST_ACTION_TS") || "0", 10) || 0;
+    let localDatabaseRevision = parseInt(SafeStorage.getItem("LAB_ERP_DB_REVISION") || "1", 10) || 1;
 
     function extractBundleFromRemote(remoteDb) {
       if (!remoteDb) return null;
@@ -4593,120 +4600,38 @@
       return null;
     }
 
-    // ========================================================
-    // KONFİGÜRASYON VERSİYON / ZAMAN DAMGASI (ÇİFT BİLGİSAYAR ÇAKIŞMA ÖNLEYİCİ)
-    // ========================================================
-    var isApplyingRemoteCloudSync = false;
-    var localConfigTimestamps = {
-      templateFields: 0,
-      sidebarFacets: 0,
-      rawMaterialSpecs: 0,
-      savedFilterLayouts: 0,
-      savedViews: 0,
-      productCards: 0,
-      masterData: 0,
-      usersList: 0,
-      roleTemplates: 0
-    };
-    try {
-      const savedTs = SafeStorage.getItem("LAB_ERP_CONFIG_TIMESTAMPS");
-      if (savedTs) localConfigTimestamps = Object.assign(localConfigTimestamps, JSON.parse(savedTs));
-    } catch(e) {}
+    // HERHANGİ BİR BİLGİSAYARDA SİLME / EKLEME / DÜZENLEME YAPILDIĞINDA ÇAĞRILIR
+    // O BİLGİSAYAR ANINDA OTORİTER MASTER OLUR VE 50ms İÇİNDE DİĞER BİLGİSAYARA BASAR
+    function markLocalDatabaseModified(actionDescription = "Güncelleme") {
+      lastLocalMutationTime = Date.now();
+      localDatabaseRevision++;
+      SafeStorage.setItem("LAB_ERP_DB_REVISION", String(localDatabaseRevision));
+      SafeStorage.setItem("LAB_ERP_LAST_ACTION_TS", String(lastLocalMutationTime));
 
-    function markConfigModified(configKey) {
-      localConfigTimestamps[configKey] = Date.now();
-      try {
-        SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
-      } catch(e) {}
+      if (typeof triggerCloudSyncImmediate === "function") {
+        triggerCloudSyncImmediate(actionDescription);
+      }
     }
 
-    function triggerCloudSyncDebounced(delay = 600) {
-      if (isApplyingRemoteCloudSync) return; // Uzaktan gelen veri uygulanırken asla geri push tetikleme!
+    // Gecikmesiz Canlı Gönderim (Sadece 50ms toplama gecikmesi)
+    function triggerCloudSyncImmediate(actionDescription = "Güncelleme") {
+      if (isApplyingRemoteCloudSync) return;
       if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
       cloudSyncDebounceTimer = setTimeout(() => {
-        syncWithCloudNow(false);
-      }, delay);
+        pushAuthoritativeMasterToFirebase(actionDescription);
+      }, 50);
     }
 
-    function initFirebaseRealtime() {
-      // 1. Sayfa açılır açılmaz sunucudaki en güncel kayıtları çek
-      setTimeout(() => { triggerFirebasePull(false); }, 300);
-
-      // 2. Canlı Dinleyici (Server-Sent Events / SSE)
-      if (typeof EventSource !== "undefined") {
-        try {
-          if (firebaseSseSource) firebaseSseSource.close();
-          firebaseSseSource = new EventSource(FIREBASE_ENDPOINT);
-
-          firebaseSseSource.addEventListener("put", function(e) {
-            try {
-              const msg = JSON.parse(e.data);
-              if (msg && typeof msg === "object") {
-                if (msg.data) {
-                  const extracted = extractBundleFromRemote(msg.data);
-                  if (extracted && extracted.records) {
-                    handleCloudSyncResponse(extracted, false);
-                    return;
-                  }
-                }
-                // Eğer path bazlı bildirim geldiyse temiz bir pull yap
-                if (msg.path === "/" || msg.path === "/payload") {
-                  triggerFirebasePull(false);
-                }
-              }
-            } catch(err) {
-              console.warn("Firebase SSE ayrıştırma uyarısı:", err);
-            }
-          });
-
-          firebaseSseSource.onerror = function() {
-            // SSE kesilirse arka plan sorgusu devam eder
-          };
-        } catch(err) {
-          console.warn("EventSource başlatılamadı:", err);
-        }
-      }
-
-      // 3. Arka plan sorgusu (Her 15 saniyede bir garantileme)
-      setInterval(() => {
-        triggerFirebasePull(false);
-      }, 15000);
-
-      // 4. Kullanıcı sekmeye her döndüğünde anında tazele
-      window.addEventListener("focus", () => {
-        triggerFirebasePull(false);
-      });
+    function triggerCloudSyncDebounced(delay = 50) {
+      triggerCloudSyncImmediate("Düzenleme");
     }
 
-    // Sadece sunucudaki güncel verileri çekip yerelle birleştirir
-    function triggerFirebasePull(isUserInitiated = false) {
-      if (isCloudSyncInProgress) return;
-
-      fetch(FIREBASE_ENDPOINT)
-        .then(res => {
-          if (!res.ok) {
-            return res.text().then(t => { throw new Error("HTTP " + res.status + " " + t); });
-          }
-          return res.json();
-        })
-        .then(remoteRaw => {
-          const remoteDb = extractBundleFromRemote(remoteRaw);
-          if (remoteDb && remoteDb.records && Array.isArray(remoteDb.records)) {
-            handleCloudSyncResponse(remoteDb, isUserInitiated);
-          } else if (remoteRaw === null) {
-            // Veritabanı henüz boşsa yereldeki kayıtları sunucuya yaz
-            pushLocalToFirebase(isUserInitiated);
-          } else {
-            setCloudStatusReady();
-          }
-        })
-        .catch(err => {
-          handleCloudSyncError(err, isUserInitiated);
-        });
+    function markConfigModified(configKey) {
+      markLocalDatabaseModified(`Konfigürasyon: ${configKey}`);
     }
 
-    // Hem sunucudan çeker, birleştirir ve sunucuya geri yazar
-    function syncWithCloudNow(isUserInitiated = false) {
+    // OTORİTER MASTER PAKETİ FIREBASE'E GÖNDERME
+    function pushAuthoritativeMasterToFirebase(actionDescription = "Güncelleme") {
       if (isCloudSyncInProgress) return;
       isCloudSyncInProgress = true;
 
@@ -4721,148 +4646,41 @@
         badge.innerText = "Eşitleniyor";
       }
 
-      // Önce sunucudaki veriyi oku
-      fetch(FIREBASE_ENDPOINT)
-        .then(res => {
-          if (!res.ok) {
-            return res.text().then(t => { throw new Error("HTTP " + res.status + " " + t); });
-          }
-          return res.json();
-        })
-        .then(remoteRaw => {
-          const remoteDb = extractBundleFromRemote(remoteRaw);
-          const recordMap = new Map();
-
-          // Silinmiş kayıt kimliklerini topla (Bunlar asla tekrar canlandırılamaz!)
-          const deletedIdSet = new Set((deletedRecords || []).map(d => String(d.id)));
-          if (remoteDb && Array.isArray(remoteDb.deletedRecords)) {
-            remoteDb.deletedRecords.forEach(d => {
-              if (d && d.id) {
-                deletedIdSet.add(String(d.id));
-                if (!deletedRecords.some(x => String(x.id) === String(d.id))) {
-                  deletedRecords.push(d);
-                }
-              }
-            });
-            saveDeletedRecordsToStorage();
-          }
-
-          // 1. Sunucudaki kayıtları haritaya ekle (SİLİNEN KAYITLAR KESİNLİKLE HARİÇ)
-          if (remoteDb && Array.isArray(remoteDb.records)) {
-            remoteDb.records.forEach(r => {
-              if (r && r.id && !deletedIdSet.has(String(r.id))) {
-                recordMap.set(String(r.id), r);
-              }
-            });
-          }
-
-          // 2. Yereldeki aktif kayıtları haritaya ekle (SİLİNEN KAYITLAR KESİNLİKLE HARİÇ)
-          if (Array.isArray(labRecords)) {
-            labRecords.forEach(r => {
-              if (r && r.id && !deletedIdSet.has(String(r.id))) {
-                recordMap.set(String(r.id), r);
-              }
-            });
-          }
-
-          const mergedRecords = Array.from(recordMap.values());
-          mergedRecords.sort((a, b) => (b.id || 0) - (a.id || 0));
-
-          // 3. Ürün kartları ve listeleri birleştir
-          let mergedProductCards = Object.assign({}, (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}));
-          if (remoteDb && remoteDb.productCards) {
-            mergedProductCards = Object.assign({}, remoteDb.productCards, (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}));
-          }
-
-          let mergedUrunList = Array.from(new Set([...URUN_LIST, ...((remoteDb && remoteDb.urunList) || [])]));
-
-          const bundleToPush = buildFullCloudSyncBundle(mergedRecords, remoteDb);
-
-          const safeStorePayload = {
-            payload: JSON.stringify(bundleToPush),
-            updatedAt: new Date().toISOString()
-          };
-
-          // Sunucuya güvenli şekilde gönder
-          return fetch(FIREBASE_ENDPOINT, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(safeStorePayload)
-          })
-          .then(res => {
-            if (!res.ok) {
-              return res.text().then(t => { throw new Error("HTTP PUT " + res.status + " " + t); });
-            }
-            return bundleToPush;
-          });
-        })
-        .then(finalBundle => {
-          handleCloudSyncResponse(finalBundle, isUserInitiated);
-        })
-        .catch(err => {
-          handleCloudSyncError(err, isUserInitiated);
-        });
-    }
-
-    function buildFullCloudSyncBundle(recordsToInclude, remoteDb = null) {
-      const remoteTs = (remoteDb && remoteDb.configTimestamps) ? remoteDb.configTimestamps : {};
-
-      // 1. Şablon Alanları & Ebatları: Yerelde değiştirildiyse veya canlı modifiye açıksa yerelinki esastır
-      const isLocalEditingModifier = (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode);
-      const useLocalTemplate = isLocalEditingModifier || (localConfigTimestamps.templateFields >= (remoteTs.templateFields || 0));
-      const finalTemplateFields = useLocalTemplate ? (templateFields || []) : (remoteDb.templateFields || templateFields || []);
-
-      // 2. Filtre Alanları (Sidebar Facets): En son değiştirilen bilgisayarınki esastır
-      const useLocalFacets = localConfigTimestamps.sidebarFacets >= (remoteTs.sidebarFacets || 0);
-      const finalSidebarFacets = useLocalFacets ? (SIDEBAR_FACET_FIELDS || []) : (remoteDb.sidebarFacets || SIDEBAR_FACET_FIELDS || []);
-
-      // 3. Hammadde Oranları
-      const useLocalRawSpecs = localConfigTimestamps.rawMaterialSpecs >= (remoteTs.rawMaterialSpecs || 0);
-      const finalRawSpecs = useLocalRawSpecs ? (RAW_MATERIAL_SPECS || DEFAULT_RAW_MATERIAL_SPECS) : (remoteDb.rawMaterialSpecs || RAW_MATERIAL_SPECS || DEFAULT_RAW_MATERIAL_SPECS);
-
-      // 4. Özelleştirilmiş Filtre Düzenleri
-      const useLocalFilterLayouts = localConfigTimestamps.savedFilterLayouts >= (remoteTs.savedFilterLayouts || 0);
-      const finalFilterLayouts = useLocalFilterLayouts ? (SAVED_FILTER_LAYOUTS || {}) : Object.assign({}, SAVED_FILTER_LAYOUTS, remoteDb.savedFilterLayouts || {});
-
-      // Zaman damgalarını birleştir
-      const mergedTimestamps = Object.assign({}, remoteTs, localConfigTimestamps);
-      if (useLocalTemplate) mergedTimestamps.templateFields = Math.max(localConfigTimestamps.templateFields, Date.now());
-      if (useLocalFacets) mergedTimestamps.sidebarFacets = Math.max(localConfigTimestamps.sidebarFacets, Date.now());
-
-      return {
-        records: recordsToInclude || labRecords || [],
+      const authoritativeBundle = {
+        revision: localDatabaseRevision,
+        timestamp: lastLocalMutationTime,
+        updatedAt: new Date().toISOString(),
+        sourceClientId: ERP_CLIENT_INSTANCE_ID,
+        author: (activeUser && activeUser.name) ? activeUser.name : "Tuncay Ayar",
+        action: actionDescription,
+        records: labRecords, // Otoriter liste (silinenler burada KESİNLİKLE YOK!)
         deletedRecords: deletedRecords || [],
+        templateFields: templateFields || [],
+        sidebarFacets: SIDEBAR_FACET_FIELDS || [],
+        savedFilterLayouts: SAVED_FILTER_LAYOUTS || {},
+        savedViews: savedViews || [],
         productCards: (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}),
-        rawMaterialSpecs: finalRawSpecs,
-        templateFields: finalTemplateFields,
-        customFields: finalTemplateFields.filter(f => !f.isStandard && f.enabled),
-        sidebarFacets: finalSidebarFacets,
-        savedFilterLayouts: finalFilterLayouts,
-        savedViews: (typeof savedViews !== "undefined" ? savedViews : []),
+        rawMaterialSpecs: (typeof RAW_MATERIAL_SPECS !== "undefined" && RAW_MATERIAL_SPECS ? RAW_MATERIAL_SPECS : DEFAULT_RAW_MATERIAL_SPECS),
         requiredFieldsConfig: (typeof requiredFieldsConfig !== "undefined" ? requiredFieldsConfig : {}),
-        urunList: (typeof URUN_LIST !== "undefined" ? URUN_LIST : []),
-        hatList: (typeof HAT_LIST !== "undefined" ? HAT_LIST : []),
-        gozList: (typeof GOZ_LIST !== "undefined" ? GOZ_LIST : []),
-        personelList: (typeof PERSONEL_LIST !== "undefined" ? PERSONEL_LIST : []),
-        vardiyaList: (typeof VARDIYA_LIST !== "undefined" ? VARDIYA_LIST : []),
-        turList: (typeof TUR_LIST !== "undefined" ? TUR_LIST : []),
-        surecList: (typeof SUREC_LIST !== "undefined" ? SUREC_LIST : []),
-        uygunlukList: (typeof UYGUNLUK_LIST !== "undefined" ? UYGUNLUK_LIST : []),
+        masterData: {
+          urunList: (typeof URUN_LIST !== "undefined" ? URUN_LIST : []),
+          hatList: (typeof HAT_LIST !== "undefined" ? HAT_LIST : []),
+          gozList: (typeof GOZ_LIST !== "undefined" ? GOZ_LIST : []),
+          personelList: (typeof PERSONEL_LIST !== "undefined" ? PERSONEL_LIST : []),
+          vardiyaList: (typeof VARDIYA_LIST !== "undefined" ? VARDIYA_LIST : []),
+          turList: (typeof TUR_LIST !== "undefined" ? TUR_LIST : []),
+          surecList: (typeof SUREC_LIST !== "undefined" ? SUREC_LIST : []),
+          uygunlukList: (typeof UYGUNLUK_LIST !== "undefined" ? UYGUNLUK_LIST : [])
+        },
         usersList: (typeof usersList !== "undefined" ? usersList : []),
         roleTemplates: (typeof roleTemplates !== "undefined" ? roleTemplates : []),
         hiddenColumns: (typeof hiddenColumns !== "undefined" ? hiddenColumns : []),
         customColWidths: (typeof CUSTOM_COL_WIDTHS !== "undefined" ? CUSTOM_COL_WIDTHS : {}),
-        pinnedColumns: (typeof pinnedColumns !== "undefined" ? pinnedColumns : []),
-        configTimestamps: mergedTimestamps,
-        lastUpdated: new Date().toISOString()
+        pinnedColumns: (typeof pinnedColumns !== "undefined" ? pinnedColumns : [])
       };
-    }
-
-    function pushLocalToFirebase(isUserInitiated = false) {
-      const bundleToPush = buildFullCloudSyncBundle(labRecords);
 
       const safeStorePayload = {
-        payload: JSON.stringify(bundleToPush),
+        payload: JSON.stringify(authoritativeBundle),
         updatedAt: new Date().toISOString()
       };
 
@@ -4875,250 +4693,258 @@
         if (!res.ok) {
           return res.text().then(t => { throw new Error("HTTP PUT " + res.status + " " + t); });
         }
-        handleCloudSyncResponse(bundleToPush, isUserInitiated);
+        setCloudStatusReady();
       })
       .catch(err => {
-        handleCloudSyncError(err, isUserInitiated);
+        handleCloudSyncError(err, false);
       });
     }
 
+    // CANLI FIREBASE VE SERVER-SENT EVENTS (SSE) DİNLEYİCİSİ
+    function initFirebaseRealtime() {
+      // 1. Sayfa açılır açılmaz sunucudaki en güncel kayıtları çek
+      setTimeout(() => { triggerFirebasePull(false); }, 100);
+
+      // 2. Canlı Dinleyici (Server-Sent Events / SSE)
+      initFirebaseRealtimeSSE();
+
+      // 3. Çok Hızlı Arka Plan Sorgusu (SSE Kesilse Bile Her 2.5 Saniyede Bir Anında Eşitleme)
+      setInterval(() => {
+        triggerFirebasePull(false);
+      }, 2500);
+
+      // 4. Kullanıcı sekmeye her tıkladığında veya döndüğünde anında çek
+      window.addEventListener("focus", () => { triggerFirebasePull(false); });
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") triggerFirebasePull(false);
+      });
+    }
+
+    function initFirebaseRealtimeSSE() {
+      if (typeof EventSource === "undefined") return;
+      try {
+        if (firebaseSseSource) {
+          firebaseSseSource.close();
+          firebaseSseSource = null;
+        }
+        firebaseSseSource = new EventSource(FIREBASE_ENDPOINT);
+
+        firebaseSseSource.addEventListener("put", function(e) {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg && typeof msg === "object") {
+              if (msg.data) {
+                const extracted = extractBundleFromRemote(msg.data);
+                if (extracted && extracted.records) {
+                  handleCloudSyncResponse(extracted, false);
+                  return;
+                }
+              }
+              if (msg.path === "/" || msg.path === "/payload") {
+                triggerFirebasePull(false);
+              }
+            }
+          } catch(err) {
+            console.warn("Firebase SSE ayrıştırma uyarısı:", err);
+          }
+        });
+
+        firebaseSseSource.onerror = function() {
+          try { if (firebaseSseSource) firebaseSseSource.close(); } catch(e) {}
+          firebaseSseSource = null;
+          // 1.5 saniye sonra yeniden bağlan
+          setTimeout(() => {
+            initFirebaseRealtimeSSE();
+          }, 1500);
+        };
+      } catch(err) {
+        console.warn("EventSource başlatılamadı:", err);
+      }
+    }
+
+    // SUNUCUDAN SADECE GÜNCEL MASTER VERİYİ ÇEKER (BOŞTA BEKLEYEN BİLGİSAYAR ASLA ESKİ VERİYİ SUNUCUYA YAZMAZ!)
+    function triggerFirebasePull(isUserInitiated = false) {
+      if (isCloudSyncInProgress) return;
+
+      fetch(FIREBASE_ENDPOINT)
+        .then(res => {
+          if (!res.ok) {
+            return res.text().then(t => { throw new Error("HTTP " + res.status + " " + t); });
+          }
+          return res.json();
+        })
+        .then(remoteRaw => {
+          const remoteDb = extractBundleFromRemote(remoteRaw);
+          if (remoteDb && remoteDb.records && Array.isArray(remoteDb.records)) {
+            handleCloudSyncResponse(remoteDb, isUserInitiated);
+          } else {
+            setCloudStatusReady();
+          }
+        })
+        .catch(err => {
+          handleCloudSyncError(err, isUserInitiated);
+        });
+    }
+
+    // OTORİTER MASTER VERİYİ UYGULAMA MOTORU
     function handleCloudSyncResponse(serverResult, isUserInitiated) {
       isCloudSyncInProgress = false;
-      isApplyingRemoteCloudSync = true;
       const icon = document.getElementById("cloudSyncHeaderIcon");
       const text = document.getElementById("cloudSyncHeaderText");
       const badge = document.getElementById("cloudSyncBadge");
 
       try {
         let db = extractBundleFromRemote(serverResult) || serverResult;
-        const remoteConfigTs = (db && db.configTimestamps) ? db.configTimestamps : {};
+        if (!db || !Array.isArray(db.records)) {
+          setCloudStatusReady();
+          return;
+        }
 
-        if (db && Array.isArray(db.records)) {
-          // Silinmiş kayıtları topla (Asla geri canlanamaz!)
-          const deletedIdSet = new Set((deletedRecords || []).map(d => String(d.id)));
-          if (Array.isArray(db.deletedRecords)) {
-            db.deletedRecords.forEach(d => {
-              if (d && d.id) {
-                deletedIdSet.add(String(d.id));
-                if (!deletedRecords.some(x => String(x.id) === String(d.id))) {
-                  deletedRecords.push(d);
-                }
-              }
-            });
+        // Eğer bu güncelleme zaten bu bilgisayarın az önce gönderdiği güncelleme ise tekrar işleme
+        if (db.sourceClientId && db.sourceClientId === ERP_CLIENT_INSTANCE_ID) {
+          setCloudStatusReady();
+          return;
+        }
+
+        const remoteTs = db.timestamp || (db.updatedAt ? new Date(db.updatedAt).getTime() : 0);
+        const remoteRev = parseInt(db.revision, 10) || 0;
+
+        // "EN SON HANGİ BİLGİSAYARDA BİR GÜNCELLEME OLDUYSA O BİLGİSAYAR DİĞERİNİ GÜNCELLESİN"
+        // Uzaktaki güncelleme zamanı yereldeki son değişiklikten yeniyse VEYA revizyon daha büyükse VEYA kullanıcı butona bastıysa:
+        const isRemoteAuthoritative = (remoteTs > lastLocalMutationTime) || (remoteRev > localDatabaseRevision) || isUserInitiated;
+
+        if (isRemoteAuthoritative) {
+          isApplyingRemoteCloudSync = true;
+          try {
+            // 1. KAYITLAR VE ÇÖP KUTUSU: Uzaktaki otoriter kayıt listesini doğrudan kabul et (Silinenler ASLA geri gelemez!)
+            labRecords = Array.isArray(db.records) ? db.records : labRecords;
+            deletedRecords = Array.isArray(db.deletedRecords) ? db.deletedRecords : (deletedRecords || []);
             saveDeletedRecordsToStorage();
-          }
 
-          const recordMap = new Map();
-          if (Array.isArray(labRecords)) {
-            labRecords.forEach(r => {
-              if (r && r.id && !deletedIdSet.has(String(r.id))) {
-                recordMap.set(String(r.id), r);
-              }
-            });
-          }
-
-          let addedCount = 0;
-          let changedCount = 0;
-          db.records.forEach(r => {
-            if (r && r.id && !deletedIdSet.has(String(r.id))) {
-              const strId = String(r.id);
-              if (!recordMap.has(strId)) {
-                addedCount++;
-              } else {
-                const existing = recordMap.get(strId);
-                if (JSON.stringify(existing) !== JSON.stringify(r)) {
-                  changedCount++;
-                }
-              }
-              recordMap.set(strId, r);
+            // 2. ÜRÜN KARTLARI
+            if (db.productCards && Object.keys(db.productCards).length > 0) {
+              PRODUCT_CARDS = Object.assign({}, db.productCards);
+              SafeStorage.setItem("LAB_ERP_PRODUCT_CARDS", JSON.stringify(PRODUCT_CARDS));
             }
-          });
 
-          const mergedRecords = Array.from(recordMap.values());
-          mergedRecords.sort((a, b) => (b.id || 0) - (a.id || 0));
+            // 3. HAMMADDE İÇERİKLERİ VE KATSAYILARI (RAW_MATERIAL_SPECS)
+            if (db.rawMaterialSpecs && typeof db.rawMaterialSpecs === "object" && Object.keys(db.rawMaterialSpecs).length > 0) {
+              RAW_MATERIAL_SPECS = Object.assign({}, DEFAULT_RAW_MATERIAL_SPECS, db.rawMaterialSpecs);
+              SafeStorage.setItem("LAB_ERP_RAW_MATERIAL_SPECS", JSON.stringify(RAW_MATERIAL_SPECS));
+              if (typeof updateK2OSourceOptionsText === "function") updateK2OSourceOptionsText();
+              if (typeof updateP2O5SourceOptionsText === "function") updateP2O5SourceOptionsText();
+              if (typeof loadMasterTabRawMaterialSpecs === "function") loadMasterTabRawMaterialSpecs();
+            }
 
-          const hadChanges = (addedCount > 0 || changedCount > 0 || mergedRecords.length !== labRecords.length);
-          labRecords = mergedRecords;
+            // 4. ŞABLON ALANLARI & EBATLARI (Canlı form düzenleme açık değilse)
+            if (Array.isArray(db.templateFields) && db.templateFields.length > 0 && !(typeof liveFormModifierMode !== "undefined" && liveFormModifierMode)) {
+              templateFields = db.templateFields;
+              SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+              customFields = templateFields.filter(f => !f.isStandard && f.enabled);
+              SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
+              if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
+              if (typeof syncAllFormLabelsFromTemplateFields === "function") syncAllFormLabelsFromTemplateFields();
+              if (typeof renderTableHeaders === "function") renderTableHeaders();
+              if (typeof applyAllFieldColSpans === "function") applyAllFieldColSpans();
+              if (typeof renderCustomFieldsInEntryModal === "function") renderCustomFieldsInEntryModal();
+            }
 
-          // 1. Ürün Kartları Senkronizasyonu
-          if (db.productCards && Object.keys(db.productCards).length > 0) {
-            PRODUCT_CARDS = Object.assign({}, PRODUCT_CARDS, db.productCards);
-            SafeStorage.setItem("LAB_ERP_PRODUCT_CARDS", JSON.stringify(PRODUCT_CARDS));
-          }
-
-          // 2. Hammadde İçerikleri ve Katsayıları Senkronizasyonu (RAW_MATERIAL_SPECS)
-          if (db.rawMaterialSpecs && typeof db.rawMaterialSpecs === "object" && Object.keys(db.rawMaterialSpecs).length > 0) {
-            RAW_MATERIAL_SPECS = Object.assign({}, DEFAULT_RAW_MATERIAL_SPECS, db.rawMaterialSpecs);
-            SafeStorage.setItem("LAB_ERP_RAW_MATERIAL_SPECS", JSON.stringify(RAW_MATERIAL_SPECS));
-            if (typeof updateK2OSourceOptionsText === "function") updateK2OSourceOptionsText();
-            if (typeof updateP2O5SourceOptionsText === "function") updateP2O5SourceOptionsText();
-            if (typeof loadMasterTabRawMaterialSpecs === "function") loadMasterTabRawMaterialSpecs();
-          }
-
-          // 3. Şablon Alanları & Ebatları Senkronizasyonu (templateFields & customFields)
-          const remoteTemplateTs = remoteConfigTs.templateFields || 0;
-          const isRemoteTemplateNewer = remoteTemplateTs > (localConfigTimestamps.templateFields || 0);
-          const isUserInLiveModifier = (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode);
-
-          if (Array.isArray(db.templateFields) && db.templateFields.length > 0 && isRemoteTemplateNewer && !isUserInLiveModifier) {
-            templateFields = db.templateFields;
-            localConfigTimestamps.templateFields = remoteTemplateTs;
-            SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
-            SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
-            customFields = templateFields.filter(f => !f.isStandard && f.enabled);
-            SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
-            if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
-            if (typeof syncAllFormLabelsFromTemplateFields === "function") syncAllFormLabelsFromTemplateFields();
-            if (typeof renderTableHeaders === "function") renderTableHeaders();
-            if (typeof applyAllFieldColSpans === "function") applyAllFieldColSpans();
-            if (typeof renderCustomFieldsInEntryModal === "function") renderCustomFieldsInEntryModal();
-          }
-
-          // 4. Filtre Alanları Senkronizasyonu (sidebarFacets)
-          const remoteFacetsTs = remoteConfigTs.sidebarFacets || 0;
-          const isRemoteFacetsNewer = remoteFacetsTs > (localConfigTimestamps.sidebarFacets || 0);
-
-          if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
-            if (isRemoteFacetsNewer) {
-              // Uzaktan gelen facetleri alırken yereldeki gizli sütunları (hiddenColumns) kaybetme
-              const localFacetMap = new Map();
-              (SIDEBAR_FACET_FIELDS || []).forEach(f => {
-                if (f && f.id) localFacetMap.set(f.id, f);
-              });
-
-              db.sidebarFacets.forEach(rf => {
-                const lf = localFacetMap.get(rf.id);
-                if (lf && Array.isArray(lf.hiddenColumns) && lf.hiddenColumns.length > 0 && (!rf.hiddenColumns || rf.hiddenColumns.length === 0)) {
-                  rf.hiddenColumns = [...lf.hiddenColumns];
-                }
-              });
-
+            // 5. FİLTRE ALANLARI (SIDEBAR FACETS): Silinen veya eklenen filtreler diğer bilgisayardan tam olarak aktarılır
+            if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
               SIDEBAR_FACET_FIELDS = db.sidebarFacets;
-              localConfigTimestamps.sidebarFacets = remoteFacetsTs;
               SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
-              SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
               if (typeof renderSidebarFacetSectionsDOM === "function") renderSidebarFacetSectionsDOM();
             }
-          }
 
-          // 5. Özelleştirilmiş Filtre Düzenleri & Görünümler Senkronizasyonu
-          const remoteLayoutsTs = remoteConfigTs.savedFilterLayouts || 0;
-          const isRemoteLayoutsNewer = remoteLayoutsTs > (localConfigTimestamps.savedFilterLayouts || 0);
-
-          if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
-            if (isRemoteLayoutsNewer) {
-              SAVED_FILTER_LAYOUTS = Object.assign({}, SAVED_FILTER_LAYOUTS, db.savedFilterLayouts);
-              localConfigTimestamps.savedFilterLayouts = remoteLayoutsTs;
-            } else {
-              SAVED_FILTER_LAYOUTS = Object.assign({}, db.savedFilterLayouts, SAVED_FILTER_LAYOUTS);
+            // 6. ÖZELLEŞTİRİLMİŞ FİLTRE DÜZENLERİ (SAVED_FILTER_LAYOUTS)
+            if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
+              SAVED_FILTER_LAYOUTS = Object.assign({}, db.savedFilterLayouts);
+              saveSavedFilterLayoutsToStorage();
             }
-            saveSavedFilterLayoutsToStorage();
-          }
-          if (Array.isArray(db.savedViews) && db.savedViews.length > 0) {
-            const viewMap = new Map();
-            (savedViews || []).forEach(v => { if (v && v.id) viewMap.set(v.id, v); });
-            db.savedViews.forEach(v => { if (v && v.id) viewMap.set(v.id, v); });
-            savedViews = Array.from(viewMap.values());
-            SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
-            if (typeof renderSavedViewsList === "function") renderSavedViewsList();
-          }
 
-          // 6. Zorunlu Alan Kuralları Senkronizasyonu
-          if (db.requiredFieldsConfig && typeof db.requiredFieldsConfig === "object") {
-            requiredFieldsConfig = Object.assign({}, requiredFieldsConfig, db.requiredFieldsConfig);
-            SafeStorage.setItem("LAB_ERP_REQUIRED_FIELDS", JSON.stringify(requiredFieldsConfig));
-            if (typeof updateRequiredStars === "function") updateRequiredStars();
-          }
+            // 7. KAYITLI GÖRÜNÜMLER (savedViews)
+            if (Array.isArray(db.savedViews) && db.savedViews.length > 0) {
+              savedViews = db.savedViews;
+              SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
+              if (typeof renderSavedViewsList === "function") renderSavedViewsList();
+            }
 
-          // 7. Master Tanımlama Listeleri Senkronizasyonu
-          if (Array.isArray(db.urunList) && db.urunList.length > 0) {
-            URUN_LIST = Array.from(new Set([...URUN_LIST, ...db.urunList]));
-            SafeStorage.setItem("LAB_ERP_URUN_LIST", JSON.stringify(URUN_LIST));
-          }
-          if (Array.isArray(db.hatList) && db.hatList.length > 0) {
-            HAT_LIST = Array.from(new Set([...HAT_LIST, ...db.hatList]));
-            SafeStorage.setItem("LAB_ERP_HAT_LIST", JSON.stringify(HAT_LIST));
-          }
-          if (Array.isArray(db.gozList) && db.gozList.length > 0) {
-            GOZ_LIST = Array.from(new Set([...GOZ_LIST, ...db.gozList]));
-            SafeStorage.setItem("LAB_ERP_GOZ_LIST", JSON.stringify(GOZ_LIST));
-          }
-          if (Array.isArray(db.personelList) && db.personelList.length > 0) {
-            PERSONEL_LIST = Array.from(new Set([...PERSONEL_LIST, ...db.personelList]));
-            SafeStorage.setItem("LAB_ERP_PERSONEL_LIST", JSON.stringify(PERSONEL_LIST));
-          }
-          if (Array.isArray(db.vardiyaList) && db.vardiyaList.length > 0) {
-            VARDIYA_LIST = Array.from(new Set([...VARDIYA_LIST, ...db.vardiyaList]));
-            SafeStorage.setItem("LAB_ERP_VARDIYA_LIST", JSON.stringify(VARDIYA_LIST));
-          }
-          if (Array.isArray(db.turList) && db.turList.length > 0 && typeof TUR_LIST !== "undefined") {
-            TUR_LIST = Array.from(new Set([...TUR_LIST, ...db.turList]));
-            SafeStorage.setItem("LAB_ERP_TUR_LIST", JSON.stringify(TUR_LIST));
-          }
-          if (Array.isArray(db.surecList) && db.surecList.length > 0 && typeof SUREC_LIST !== "undefined") {
-            SUREC_LIST = Array.from(new Set([...SUREC_LIST, ...db.surecList]));
-            SafeStorage.setItem("LAB_ERP_SUREC_LIST", JSON.stringify(SUREC_LIST));
-          }
-          if (Array.isArray(db.uygunlukList) && db.uygunlukList.length > 0 && typeof UYGUNLUK_LIST !== "undefined") {
-            UYGUNLUK_LIST = Array.from(new Set([...UYGUNLUK_LIST, ...db.uygunlukList]));
-            SafeStorage.setItem("LAB_ERP_UYGUNLUK_LIST", JSON.stringify(UYGUNLUK_LIST));
-          }
-          if (typeof refreshAllDropdowns === "function") refreshAllDropdowns();
+            // 8. ZORUNLU ALAN KURALLARI
+            if (db.requiredFieldsConfig && typeof db.requiredFieldsConfig === "object") {
+              requiredFieldsConfig = Object.assign({}, db.requiredFieldsConfig);
+              SafeStorage.setItem("LAB_ERP_REQUIRED_FIELDS", JSON.stringify(requiredFieldsConfig));
+              if (typeof updateRequiredStars === "function") updateRequiredStars();
+            }
 
-          // 8. Roller ve Kullanıcı Yetkileri Senkronizasyonu
-          if (Array.isArray(db.usersList) && db.usersList.length > 0) {
-            usersList = db.usersList;
-            if (typeof saveUsersToStorage === "function") saveUsersToStorage();
-          }
-          if (Array.isArray(db.roleTemplates) && db.roleTemplates.length > 0) {
-            roleTemplates = db.roleTemplates;
-            if (typeof saveRoleTemplatesToStorage === "function") saveRoleTemplatesToStorage();
-          }
+            // 9. MASTER TANIMLAMA LİSTELERİ
+            if (db.masterData && typeof db.masterData === "object") {
+              const md = db.masterData;
+              if (Array.isArray(md.urunList)) URUN_LIST = md.urunList;
+              if (Array.isArray(md.hatList)) HAT_LIST = md.hatList;
+              if (Array.isArray(md.gozList)) GOZ_LIST = md.gozList;
+              if (Array.isArray(md.personelList)) PERSONEL_LIST = md.personelList;
+              if (Array.isArray(md.vardiyaList)) VARDIYA_LIST = md.vardiyaList;
+              if (Array.isArray(md.turList) && typeof TUR_LIST !== "undefined") TUR_LIST = md.turList;
+              if (Array.isArray(md.surecList) && typeof SUREC_LIST !== "undefined") SUREC_LIST = md.surecList;
+              if (Array.isArray(md.uygunlukList) && typeof UYGUNLUK_LIST !== "undefined") UYGUNLUK_LIST = md.uygunlukList;
+            }
+            if (typeof syncMasterListsAndStorage === "function") syncMasterListsAndStorage();
+            if (typeof refreshAllDropdowns === "function") refreshAllDropdowns();
 
-          // Yerel depoya kaydet ve tabloyu tazele
-          const jsonStr = JSON.stringify(labRecords);
-          SafeStorage.setItem("LAB_ERP_RECORDS", jsonStr);
-          SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
-          saveMasterDatabaseToStorage();
+            // 10. KULLANICILAR VE ROLLER
+            if (Array.isArray(db.usersList) && db.usersList.length > 0) {
+              usersList = db.usersList;
+              if (typeof saveUsersToStorage === "function") saveUsersToStorage();
+            }
+            if (Array.isArray(db.roleTemplates) && db.roleTemplates.length > 0) {
+              roleTemplates = db.roleTemplates;
+              if (typeof saveRoleTemplatesToStorage === "function") saveRoleTemplatesToStorage();
+            }
 
-          if (hadChanges || isUserInitiated) {
+            // Yerel revizyonu ve zamanı güncelle
+            localDatabaseRevision = Math.max(localDatabaseRevision, remoteRev);
+            lastLocalMutationTime = Math.max(lastLocalMutationTime, remoteTs);
+            SafeStorage.setItem("LAB_ERP_DB_REVISION", String(localDatabaseRevision));
+            SafeStorage.setItem("LAB_ERP_LAST_ACTION_TS", String(lastLocalMutationTime));
+
+            // Yerel depoya kaydet ve tabloyu tazele
+            const jsonStr = JSON.stringify(labRecords);
+            SafeStorage.setItem("LAB_ERP_RECORDS", jsonStr);
+            SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
+            saveMasterDatabaseToStorage();
+
+            if (typeof applyColumnVisibility === "function") applyColumnVisibility();
+            if (typeof renderTableHeaders === "function") renderTableHeaders();
             if (typeof applyTableFilters === "function") {
               applyTableFilters();
-            } else {
+            } else if (typeof renderTable === "function") {
               renderTable(labRecords);
             }
-          }
+            if (typeof updateSidebarCounts === "function") updateSidebarCounts((typeof currentFilteredRecords !== "undefined" && currentFilteredRecords) ? currentFilteredRecords : labRecords);
+            if (typeof updateTrashBadge === "function") updateTrashBadge();
 
-          // Eğer yerelde sunucuda henüz olmayan yeni kayıtlar varsa (örneğin az önce çoğaltılan kayıt), sunucuya hemen push et
-          const serverIdSet = new Set((db.records || []).map(r => String(r.id)));
-          const hasLocalOnlyRecords = mergedRecords.some(r => !serverIdSet.has(String(r.id)));
-          if (hasLocalOnlyRecords) {
-            setTimeout(() => {
-              syncWithCloudNow(false);
-            }, 200);
+            if (isUserInitiated && typeof showToastNotification === "function") {
+              showToastNotification(`Firebase ortak veritabanı ile eşitlendi! (Toplam: ${labRecords.length} analiz kaydı)`);
+            } else if (typeof showToastNotification === "function" && db.action) {
+              showToastNotification(`Diğer bilgisayardan güncel veriler (${db.action}) canlı olarak eşitlendi.`);
+            }
+          } finally {
+            setTimeout(() => { isApplyingRemoteCloudSync = false; }, 300);
           }
-
-          if (icon) icon.className = "fa-solid fa-cloud-arrow-up text-emerald-400";
-          if (text) text.innerText = `Bulut: Canlı (${labRecords.length})`;
-          if (badge) {
-            badge.className = "bg-emerald-600 text-white text-[9.5px] px-1.5 py-0.2 rounded font-bold shadow-xs";
-            badge.innerText = "Canlı";
-          }
-
-          if (isUserInitiated && typeof showToastNotification === "function") {
-            showToastNotification(`Firebase ortak veritabanı ile eşitlendi! (Toplam: ${labRecords.length} analiz kaydı)`);
-          } else if (addedCount > 0 && typeof showToastNotification === "function") {
-            showToastNotification(`Diğer bilgisayardan ${addedCount} yeni analiz kaydı canlı olarak aktarıldı.`);
-          }
-          return;
         }
       } catch(e) {
         console.error("handleCloudSyncResponse hatası:", e);
       } finally {
-        setTimeout(() => { isApplyingRemoteCloudSync = false; }, 500);
+        setCloudStatusReady();
       }
+    }
 
-      setCloudStatusReady();
+    function syncWithCloudNow(isUserInitiated = false) {
+      if (isUserInitiated) {
+        triggerFirebasePull(true);
+      } else {
+        triggerCloudSyncImmediate("Manuel Eşitleme");
+      }
     }
 
     function setCloudStatusReady() {
@@ -5340,8 +5166,8 @@
           showToastNotification(`Kayıt #${id}${recordCode} silindi ve numarası boşa çıkarıldı.`);
         }
 
-        // Bulut veritabanından da derhal silinsin (Asla geri gelmesin)
-        syncWithCloudNow(false);
+        // Bulut veritabanından da derhal silinsin (Otoriter Master: Asla geri gelemez)
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Kayıt Silme #" + id);
       }
     }
 
@@ -5374,6 +5200,7 @@
         saveLabRecordsToStorage();
         applyTableFilters();
         renderTrashRecordsList();
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Kayıt Geri Yükleme #" + id);
       }
     }
 
@@ -5381,6 +5208,7 @@
       if (confirm(`Kayıt #${id} kalıcı olarak silinsin mi?\n\nBu işlem geri alınamaz!`)) {
         deletedRecords = deletedRecords.filter(r => r.id !== id);
         saveDeletedRecordsToStorage();
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Kayıt Kalıcı Silme #" + id);
         renderTrashRecordsList();
         if (typeof showToastNotification === "function") {
           showToastNotification(`Kayıt #${id} kalıcı olarak temizlendi.`);
@@ -5396,6 +5224,7 @@
       if (confirm("Çöp kutusundaki tüm kayıtlar kalıcı olarak silinsin mi?")) {
         deletedRecords = [];
         saveDeletedRecordsToStorage();
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Çöp Kutusunu Boşaltma");
         renderTrashRecordsList();
         if (typeof showToastNotification === "function") {
           showToastNotification("Çöp kutusu tamamen boşaltıldı.");
@@ -12764,10 +12593,9 @@ function openTableModifierModal(e) {
       if (f) {
         f.colSpan = span;
       }
-      if (typeof markConfigModified === "function") markConfigModified("templateFields");
       saveTemplateFieldsToStorage();
       applyAllFieldColSpans();
-      if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Alan Boyutu: " + fieldKey + " (" + span + "/4)");
 
       if (typeof attachLiveModifierBarsToFields === "function" && typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         attachLiveModifierBarsToFields();
@@ -12976,11 +12804,10 @@ function openTableModifierModal(e) {
       }
 
       if (moved) {
-        if (typeof markConfigModified === "function") markConfigModified("templateFields");
         finalizeFieldOrderFromDOM(true);
         applyAllFieldColSpans();
         attachLiveModifierBarsToFields();
-        if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Alan Taşıma: " + f.label);
         if (typeof showToastNotification === "function") {
           showToastNotification(`"${f.label}" alanı kaydırıldı.`);
         }
@@ -14311,6 +14138,7 @@ function initializeLabErpApp() {
       saveSidebarFacetsToStorage();
       renderSidebarFacetSectionsDOM();
       applyTableFilters();
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Filtre Silme: " + name);
 
       if (typeof showToastNotification === "function") {
         showToastNotification(`"${name}" filtre alanı sol panelden kaldırıldı.`);
@@ -14478,6 +14306,7 @@ function initializeLabErpApp() {
       closeSidebarFacetModal();
       renderSidebarFacetSectionsDOM();
       applyTableFilters();
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Filtre Düzenleme: " + label);
     }
 
     function deleteCurrentModalFacet() {
@@ -16277,11 +16106,7 @@ function initializeLabErpApp() {
       }
 
       applyTableFilters();
-      if (typeof markConfigModified === "function") {
-        markConfigModified("savedFilterLayouts");
-        markConfigModified("sidebarFacets");
-      }
-      if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Filtre Özelleştirme: " + facetName);
 
       if (typeof hideAllFacetActionBars === "function") hideAllFacetActionBars();
       isCurrentViewModified = false;
@@ -20305,6 +20130,7 @@ function renderDataCellHtml(row, f) {
       refreshAllDropdowns();
       closeModal();
       applyTableFilters();
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Kayıt Kaydetme #" + (currentEditingId || "Yeni"));
       if (typeof showToastNotification === "function") showToastNotification("Analiz kaydı başarıyla kaydedildi (Kalıcı)");
     }
 
@@ -21797,8 +21623,8 @@ let forceShowAllNutrients = false;
       SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
       saveMasterDatabaseToStorage();
 
-      if (typeof syncWithCloudNow === "function") {
-        syncWithCloudNow(true);
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Excel'den ${successCount} Kayıt İçe Aktarma`);
       }
 
       applyTableFilters();
