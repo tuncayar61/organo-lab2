@@ -4593,11 +4593,39 @@
       return null;
     }
 
-    function triggerCloudSyncDebounced() {
+    // ========================================================
+    // KONFİGÜRASYON VERSİYON / ZAMAN DAMGASI (ÇİFT BİLGİSAYAR ÇAKIŞMA ÖNLEYİCİ)
+    // ========================================================
+    var isApplyingRemoteCloudSync = false;
+    var localConfigTimestamps = {
+      templateFields: 0,
+      sidebarFacets: 0,
+      rawMaterialSpecs: 0,
+      savedFilterLayouts: 0,
+      savedViews: 0,
+      productCards: 0,
+      masterData: 0,
+      usersList: 0,
+      roleTemplates: 0
+    };
+    try {
+      const savedTs = SafeStorage.getItem("LAB_ERP_CONFIG_TIMESTAMPS");
+      if (savedTs) localConfigTimestamps = Object.assign(localConfigTimestamps, JSON.parse(savedTs));
+    } catch(e) {}
+
+    function markConfigModified(configKey) {
+      localConfigTimestamps[configKey] = Date.now();
+      try {
+        SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
+      } catch(e) {}
+    }
+
+    function triggerCloudSyncDebounced(delay = 600) {
+      if (isApplyingRemoteCloudSync) return; // Uzaktan gelen veri uygulanırken asla geri push tetikleme!
       if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
       cloudSyncDebounceTimer = setTimeout(() => {
         syncWithCloudNow(false);
-      }, 800);
+      }, delay);
     }
 
     function initFirebaseRealtime() {
@@ -4748,7 +4776,7 @@
 
           let mergedUrunList = Array.from(new Set([...URUN_LIST, ...((remoteDb && remoteDb.urunList) || [])]));
 
-          const bundleToPush = buildFullCloudSyncBundle(mergedRecords);
+          const bundleToPush = buildFullCloudSyncBundle(mergedRecords, remoteDb);
 
           const safeStorePayload = {
             payload: JSON.stringify(bundleToPush),
@@ -4776,16 +4804,40 @@
         });
     }
 
-    function buildFullCloudSyncBundle(recordsToInclude) {
+    function buildFullCloudSyncBundle(recordsToInclude, remoteDb = null) {
+      const remoteTs = (remoteDb && remoteDb.configTimestamps) ? remoteDb.configTimestamps : {};
+
+      // 1. Şablon Alanları & Ebatları: Yerelde değiştirildiyse veya canlı modifiye açıksa yerelinki esastır
+      const isLocalEditingModifier = (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode);
+      const useLocalTemplate = isLocalEditingModifier || (localConfigTimestamps.templateFields >= (remoteTs.templateFields || 0));
+      const finalTemplateFields = useLocalTemplate ? (templateFields || []) : (remoteDb.templateFields || templateFields || []);
+
+      // 2. Filtre Alanları (Sidebar Facets): En son değiştirilen bilgisayarınki esastır
+      const useLocalFacets = localConfigTimestamps.sidebarFacets >= (remoteTs.sidebarFacets || 0);
+      const finalSidebarFacets = useLocalFacets ? (SIDEBAR_FACET_FIELDS || []) : (remoteDb.sidebarFacets || SIDEBAR_FACET_FIELDS || []);
+
+      // 3. Hammadde Oranları
+      const useLocalRawSpecs = localConfigTimestamps.rawMaterialSpecs >= (remoteTs.rawMaterialSpecs || 0);
+      const finalRawSpecs = useLocalRawSpecs ? (RAW_MATERIAL_SPECS || DEFAULT_RAW_MATERIAL_SPECS) : (remoteDb.rawMaterialSpecs || RAW_MATERIAL_SPECS || DEFAULT_RAW_MATERIAL_SPECS);
+
+      // 4. Özelleştirilmiş Filtre Düzenleri
+      const useLocalFilterLayouts = localConfigTimestamps.savedFilterLayouts >= (remoteTs.savedFilterLayouts || 0);
+      const finalFilterLayouts = useLocalFilterLayouts ? (SAVED_FILTER_LAYOUTS || {}) : Object.assign({}, SAVED_FILTER_LAYOUTS, remoteDb.savedFilterLayouts || {});
+
+      // Zaman damgalarını birleştir
+      const mergedTimestamps = Object.assign({}, remoteTs, localConfigTimestamps);
+      if (useLocalTemplate) mergedTimestamps.templateFields = Math.max(localConfigTimestamps.templateFields, Date.now());
+      if (useLocalFacets) mergedTimestamps.sidebarFacets = Math.max(localConfigTimestamps.sidebarFacets, Date.now());
+
       return {
         records: recordsToInclude || labRecords || [],
         deletedRecords: deletedRecords || [],
         productCards: (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}),
-        rawMaterialSpecs: (typeof RAW_MATERIAL_SPECS !== "undefined" && RAW_MATERIAL_SPECS ? RAW_MATERIAL_SPECS : (typeof DEFAULT_RAW_MATERIAL_SPECS !== "undefined" ? DEFAULT_RAW_MATERIAL_SPECS : {})),
-        templateFields: (typeof templateFields !== "undefined" ? templateFields : []),
-        customFields: (typeof customFields !== "undefined" ? customFields : []),
-        sidebarFacets: (typeof SIDEBAR_FACET_FIELDS !== "undefined" ? SIDEBAR_FACET_FIELDS : []),
-        savedFilterLayouts: (typeof SAVED_FILTER_LAYOUTS !== "undefined" ? SAVED_FILTER_LAYOUTS : {}),
+        rawMaterialSpecs: finalRawSpecs,
+        templateFields: finalTemplateFields,
+        customFields: finalTemplateFields.filter(f => !f.isStandard && f.enabled),
+        sidebarFacets: finalSidebarFacets,
+        savedFilterLayouts: finalFilterLayouts,
         savedViews: (typeof savedViews !== "undefined" ? savedViews : []),
         requiredFieldsConfig: (typeof requiredFieldsConfig !== "undefined" ? requiredFieldsConfig : {}),
         urunList: (typeof URUN_LIST !== "undefined" ? URUN_LIST : []),
@@ -4801,6 +4853,7 @@
         hiddenColumns: (typeof hiddenColumns !== "undefined" ? hiddenColumns : []),
         customColWidths: (typeof CUSTOM_COL_WIDTHS !== "undefined" ? CUSTOM_COL_WIDTHS : {}),
         pinnedColumns: (typeof pinnedColumns !== "undefined" ? pinnedColumns : []),
+        configTimestamps: mergedTimestamps,
         lastUpdated: new Date().toISOString()
       };
     }
@@ -4831,12 +4884,14 @@
 
     function handleCloudSyncResponse(serverResult, isUserInitiated) {
       isCloudSyncInProgress = false;
+      isApplyingRemoteCloudSync = true;
       const icon = document.getElementById("cloudSyncHeaderIcon");
       const text = document.getElementById("cloudSyncHeaderText");
       const badge = document.getElementById("cloudSyncBadge");
 
       try {
         let db = extractBundleFromRemote(serverResult) || serverResult;
+        const remoteConfigTs = (db && db.configTimestamps) ? db.configTimestamps : {};
 
         if (db && Array.isArray(db.records)) {
           // Silinmiş kayıtları topla (Asla geri canlanamaz!)
@@ -4901,9 +4956,15 @@
           }
 
           // 3. Şablon Alanları & Ebatları Senkronizasyonu (templateFields & customFields)
-          if (Array.isArray(db.templateFields) && db.templateFields.length > 0) {
+          const remoteTemplateTs = remoteConfigTs.templateFields || 0;
+          const isRemoteTemplateNewer = remoteTemplateTs > (localConfigTimestamps.templateFields || 0);
+          const isUserInLiveModifier = (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode);
+
+          if (Array.isArray(db.templateFields) && db.templateFields.length > 0 && isRemoteTemplateNewer && !isUserInLiveModifier) {
             templateFields = db.templateFields;
+            localConfigTimestamps.templateFields = remoteTemplateTs;
             SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+            SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
             customFields = templateFields.filter(f => !f.isStandard && f.enabled);
             SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
             if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
@@ -4914,16 +4975,44 @@
           }
 
           // 4. Filtre Alanları Senkronizasyonu (sidebarFacets)
+          const remoteFacetsTs = remoteConfigTs.sidebarFacets || 0;
+          const isRemoteFacetsNewer = remoteFacetsTs > (localConfigTimestamps.sidebarFacets || 0);
+
           if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
-            SIDEBAR_FACET_FIELDS = db.sidebarFacets;
-            SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
-            if (typeof renderSidebarFacetSectionsDOM === "function") renderSidebarFacetSectionsDOM();
+            if (isRemoteFacetsNewer) {
+              // Uzaktan gelen facetleri alırken yereldeki gizli sütunları (hiddenColumns) kaybetme
+              const localFacetMap = new Map();
+              (SIDEBAR_FACET_FIELDS || []).forEach(f => {
+                if (f && f.id) localFacetMap.set(f.id, f);
+              });
+
+              db.sidebarFacets.forEach(rf => {
+                const lf = localFacetMap.get(rf.id);
+                if (lf && Array.isArray(lf.hiddenColumns) && lf.hiddenColumns.length > 0 && (!rf.hiddenColumns || rf.hiddenColumns.length === 0)) {
+                  rf.hiddenColumns = [...lf.hiddenColumns];
+                }
+              });
+
+              SIDEBAR_FACET_FIELDS = db.sidebarFacets;
+              localConfigTimestamps.sidebarFacets = remoteFacetsTs;
+              SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
+              SafeStorage.setItem("LAB_ERP_CONFIG_TIMESTAMPS", JSON.stringify(localConfigTimestamps));
+              if (typeof renderSidebarFacetSectionsDOM === "function") renderSidebarFacetSectionsDOM();
+            }
           }
 
           // 5. Özelleştirilmiş Filtre Düzenleri & Görünümler Senkronizasyonu
+          const remoteLayoutsTs = remoteConfigTs.savedFilterLayouts || 0;
+          const isRemoteLayoutsNewer = remoteLayoutsTs > (localConfigTimestamps.savedFilterLayouts || 0);
+
           if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
-            SAVED_FILTER_LAYOUTS = Object.assign({}, SAVED_FILTER_LAYOUTS, db.savedFilterLayouts);
-            SafeStorage.setItem("LAB_ERP_SAVED_FILTER_LAYOUTS", JSON.stringify(SAVED_FILTER_LAYOUTS));
+            if (isRemoteLayoutsNewer) {
+              SAVED_FILTER_LAYOUTS = Object.assign({}, SAVED_FILTER_LAYOUTS, db.savedFilterLayouts);
+              localConfigTimestamps.savedFilterLayouts = remoteLayoutsTs;
+            } else {
+              SAVED_FILTER_LAYOUTS = Object.assign({}, db.savedFilterLayouts, SAVED_FILTER_LAYOUTS);
+            }
+            saveSavedFilterLayoutsToStorage();
           }
           if (Array.isArray(db.savedViews) && db.savedViews.length > 0) {
             const viewMap = new Map();
@@ -5025,6 +5114,8 @@
         }
       } catch(e) {
         console.error("handleCloudSyncResponse hatası:", e);
+      } finally {
+        setTimeout(() => { isApplyingRemoteCloudSync = false; }, 500);
       }
 
       setCloudStatusReady();
@@ -12673,8 +12764,10 @@ function openTableModifierModal(e) {
       if (f) {
         f.colSpan = span;
       }
+      if (typeof markConfigModified === "function") markConfigModified("templateFields");
       saveTemplateFieldsToStorage();
       applyAllFieldColSpans();
+      if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
 
       if (typeof attachLiveModifierBarsToFields === "function" && typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         attachLiveModifierBarsToFields();
@@ -12883,10 +12976,11 @@ function openTableModifierModal(e) {
       }
 
       if (moved) {
-        // TASLAK MOD: Storage'a yazmadan sadece DOM ve hafızadaki sırayı güncelle
-        finalizeFieldOrderFromDOM(false);
+        if (typeof markConfigModified === "function") markConfigModified("templateFields");
+        finalizeFieldOrderFromDOM(true);
         applyAllFieldColSpans();
         attachLiveModifierBarsToFields();
+        if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
         if (typeof showToastNotification === "function") {
           showToastNotification(`"${f.label}" alanı kaydırıldı.`);
         }
@@ -12918,8 +13012,8 @@ function openTableModifierModal(e) {
 
       templateFields = newOrder;
 
-      // SADECE kullanıcı "Değişiklikleri Kaydet & Bitir" butonuna bastığında Storage'a yaz!
       if (shouldSaveStorage) {
+        if (typeof markConfigModified === "function") markConfigModified("templateFields");
         saveTemplateFieldsToStorage();
         syncAllColumnsFromTemplateFields();
         renderTableHeaders();
@@ -14037,16 +14131,29 @@ function initializeLabErpApp() {
       const bar = document.getElementById("facet_action_bar_" + cleanKey);
       if (isHidden) {
         el.classList.remove("hidden");
-        if (bar) bar.classList.remove("hidden");
+        // Bar sadece kullanıcı fiilen değişiklik yapmışsa görünsün, yoksa asla açılmasın!
+        if (bar && isCurrentViewModified && activeFacetSectionId === cleanKey) {
+          bar.classList.remove("hidden");
+          bar.style.display = "flex";
+        }
         if (icon) icon.className = "fa-solid fa-chevron-down text-[10px] text-slate-400";
         delete SIDEBAR_COLLAPSED_FACETS[cleanKey];
       } else {
         el.classList.add("hidden");
-        if (bar) bar.classList.add("hidden");
+        if (bar) {
+          bar.classList.add("hidden");
+          bar.style.display = "none";
+        }
         if (icon) icon.className = "fa-solid fa-chevron-right text-[10px] text-slate-400";
         SIDEBAR_COLLAPSED_FACETS[cleanKey] = true;
       }
       saveSidebarCollapsedState();
+
+      // Bu filtre alanına tıklandığında/açıldığında bu filtrenin özel sütun düzenini uygula!
+      activeFacetSectionId = cleanKey;
+      const currentVal = (typeof SIDEBAR_ACTIVE_FILTERS !== "undefined") ? (SIDEBAR_ACTIVE_FILTERS[cleanKey] || "ALL") : "ALL";
+      applyFilterLayout(cleanKey, currentVal);
+      applyTableFilters();
     }
 
     // Tüm Filtre Alanlarını Tek Tıkla Toplu Daraltma / Genişletme
@@ -14115,13 +14222,16 @@ function initializeLabErpApp() {
             </h3>
             
             <div class="flex items-center space-x-1 shrink-0">
-              <!-- Yönetim Butonları: Yer Değiştirme (Yukarı/Aşağı), Düzenleme, Silme -->
+              <!-- Yönetim Butonları: Yer Değiştirme (Yukarı/Aşağı), Ekolayzır (Ayar), Düzenleme, Silme -->
               <div class="flex items-center space-x-0.5 opacity-80 group-hover/facet:opacity-100 transition-opacity bg-slate-100/90 hover:bg-slate-200 px-1 py-0.5 rounded text-[10px]" onclick="event.stopPropagation()">
                 <button type="button" onclick="moveSidebarFacet('${facet.id}', -1)" title="Yukarı Taşı" class="p-0.5 text-slate-500 hover:text-blue-600 cursor-pointer ${isFirst ? 'opacity-30 cursor-not-allowed' : ''}" ${isFirst ? 'disabled' : ''}>
                   <i class="fa-solid fa-arrow-up text-[9px]"></i>
                 </button>
                 <button type="button" onclick="moveSidebarFacet('${facet.id}', 1)" title="Aşağı Taşı" class="p-0.5 text-slate-500 hover:text-blue-600 cursor-pointer ${isLast ? 'opacity-30 cursor-not-allowed' : ''}" ${isLast ? 'disabled' : ''}>
                   <i class="fa-solid fa-arrow-down text-[9px]"></i>
+                </button>
+                <button type="button" onclick="openCustomizeFacetViewModal('${facet.id}')" title="Bu Filtrenin Sütun ve Görünüm Ayarlarını Özelleştir (Ekolayzır)" class="p-0.5 text-slate-500 hover:text-purple-600 cursor-pointer">
+                  <i class="fa-solid fa-sliders text-[9px]"></i>
                 </button>
                 <button type="button" onclick="openEditSidebarFacetModal('${facet.id}')" title="Filtre Alanını Düzenle / Güncelle" class="p-0.5 text-slate-500 hover:text-amber-600 cursor-pointer">
                   <i class="fa-solid fa-pen text-[9px]"></i>
@@ -14136,21 +14246,18 @@ function initializeLabErpApp() {
             </div>
           </div>
 
-          <!-- FİLTRE BAŞLIĞI ÖZELLEŞTİRME VE KAYDETME BARI (Filtre Başlığının Hemen Altında) -->
-          <div id="facet_action_bar_${facet.id}" class="mb-2 p-1.5 bg-slate-100/90 hover:bg-slate-100 border border-slate-200/90 rounded-lg flex items-center justify-between gap-1 transition ${isCollapsed ? 'hidden' : ''}">
+          <!-- FİLTRE BAŞLIĞI ÖZELLEŞTİRME VE KAYDETME BARI (YALNIZCA DEĞİŞİKLİK YAPILDIĞINDA GÖRÜNÜR) -->
+          <div id="facet_action_bar_${facet.id}" class="mb-2 p-1.5 bg-amber-50 border border-amber-300 rounded-lg flex items-center justify-between gap-1 shadow-2xs transition hidden" style="display: none;">
             <div class="flex items-center gap-1 min-w-0">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" id="facet_dot_${facet.id}"></span>
-              <span class="text-[9.5px] font-bold text-slate-700 truncate" id="facet_status_${facet.id}">Filtre Sütun & Düzen</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 animate-pulse" id="facet_dot_${facet.id}"></span>
+              <span class="text-[9.5px] font-bold text-amber-900 truncate" id="facet_status_${facet.id}">Değiştirildi</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-              <button type="button" onclick="event.stopPropagation(); saveCurrentFacetFilterDirectly('${facet.id}')" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9.5px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer" title="Seçtiğiniz bu filtre alanının sütun genişliğini ve gösterilmesi gereken sütunlarını kaydet">
+              <button type="button" onclick="event.stopPropagation(); saveCurrentFacetFilterDirectly('${facet.id}')" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[9.5px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer" title="Değişiklikleri sadece bu filtre alanına kaydet">
                 <i class="fa-solid fa-floppy-disk text-[8.5px]"></i> <span>Kaydet</span>
               </button>
               <button type="button" onclick="event.stopPropagation(); openSaveAsNewViewModalForFacet('${facet.id}')" class="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[9.5px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer" title="Seçili filtre kurallarını içeren yeni bir filtre alanı / görünüm oluştur">
                 <i class="fa-solid fa-bookmark text-[8.5px]"></i> <span>Farklı Kaydet</span>
-              </button>
-              <button type="button" onclick="event.stopPropagation(); openCustomizeFacetViewModal('${facet.id}')" class="p-1 bg-white hover:bg-purple-50 text-purple-700 border border-slate-300 rounded text-[9.5px] font-bold transition flex items-center gap-0.5 cursor-pointer" title="Bu filtrenin sütunlarını ve kurallarını özelleştir">
-                <i class="fa-solid fa-sliders text-[9px]"></i>
               </button>
             </div>
           </div>
@@ -15646,7 +15753,7 @@ function initializeLabErpApp() {
 
     function loadSavedFilterLayoutsFromStorage() {
       try {
-        const stored = SafeStorage.getItem("LAB_ERP_FILTER_LAYOUTS");
+        const stored = SafeStorage.getItem("LAB_ERP_FILTER_LAYOUTS") || SafeStorage.getItem("LAB_ERP_SAVED_FILTER_LAYOUTS");
         if (stored) SAVED_FILTER_LAYOUTS = JSON.parse(stored) || {};
       } catch(e) {
         SAVED_FILTER_LAYOUTS = {};
@@ -15655,7 +15762,9 @@ function initializeLabErpApp() {
 
     function saveSavedFilterLayoutsToStorage() {
       try {
-        SafeStorage.setItem("LAB_ERP_FILTER_LAYOUTS", JSON.stringify(SAVED_FILTER_LAYOUTS));
+        const jsonStr = JSON.stringify(SAVED_FILTER_LAYOUTS);
+        SafeStorage.setItem("LAB_ERP_FILTER_LAYOUTS", jsonStr);
+        SafeStorage.setItem("LAB_ERP_SAVED_FILTER_LAYOUTS", jsonStr);
         if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
       } catch(e) {}
     }
@@ -15706,22 +15815,27 @@ function initializeLabErpApp() {
     }
     function applyFilterLayout(facetId, activeVal) {
       loadSavedFilterLayoutsFromStorage();
+      if (!facetId) return;
+
+      const facetObj = (SIDEBAR_FACET_FIELDS || []).find(f => f.id === facetId);
       const specificKey = (activeVal && activeVal !== "ALL") ? `${facetId}::${activeVal}` : null;
       const facetKey = facetId;
 
       let layout = null;
+      // 1. Önce bu filtreye ve o spesifik alt seçeneğe ait özel bir düzen var mı bak
       if (specificKey && SAVED_FILTER_LAYOUTS[specificKey]) {
         layout = SAVED_FILTER_LAYOUTS[specificKey];
-      } else if (facetKey && SAVED_FILTER_LAYOUTS[facetKey] && activeVal !== "ALL") {
+      } 
+      // 2. Yoksa doğrudan bu filtre alanına (facet) ait genel özel düzen var mı bak (activeVal ALL olsa da geçerlidir!)
+      else if (facetKey && SAVED_FILTER_LAYOUTS[facetKey]) {
         layout = SAVED_FILTER_LAYOUTS[facetKey];
-      } else if (facetKey && activeVal !== "ALL") {
-        const facetObj = (SIDEBAR_FACET_FIELDS || []).find(f => f.id === facetId);
-        if (facetObj && Array.isArray(facetObj.hiddenColumns) && facetObj.hiddenColumns.length > 0) {
-          layout = {
-            hiddenColumns: facetObj.hiddenColumns,
-            columnWidths: facetObj.columnWidths || {}
-          };
-        }
+      } 
+      // 3. Yoksa facet nesnesinin kendi içinde saklanan hiddenColumns var mı bak
+      else if (facetObj && Array.isArray(facetObj.hiddenColumns) && facetObj.hiddenColumns.length > 0) {
+        layout = {
+          hiddenColumns: facetObj.hiddenColumns,
+          columnWidths: facetObj.columnWidths || {}
+        };
       }
 
       const prevHidden = JSON.stringify(hiddenColumns || []);
@@ -15730,19 +15844,21 @@ function initializeLabErpApp() {
       if (layout) {
         hiddenColumns = Array.isArray(layout.hiddenColumns) ? [...layout.hiddenColumns] : [];
         CUSTOM_COL_WIDTHS = Object.assign({}, layout.columnWidths || {});
+        saveHiddenColumnsToStorage();
       } else {
         hiddenColumns = getBaselineHiddenColumns();
         CUSTOM_COL_WIDTHS = getBaselineColWidths();
+        saveHiddenColumnsToStorage();
       }
 
       const newHidden = JSON.stringify(hiddenColumns || []);
       const newWidths = JSON.stringify(CUSTOM_COL_WIDTHS || {});
 
-      // Sadece sütun veya genişlik değişmişse tablo başlıklarını yeniden çiz (Gereksiz DOM sıfırlamasını önle)
       if (prevHidden !== newHidden || prevWidths !== newWidths) {
         applyColumnVisibility();
         renderTableHeaders();
       }
+      updateHiddenColumnsBadge();
 
       // Tablo başlığındaki filtre kutularını aktif sol panel seçimiyle senkronize et
       if (typeof SIDEBAR_ACTIVE_FILTERS !== "undefined") {
@@ -15807,6 +15923,14 @@ function initializeLabErpApp() {
         facet.columnWidths = Object.assign({}, CUSTOM_COL_WIDTHS);
         facet.savedFilters = getCurrentFilterState();
         saveSidebarFacetsToStorage();
+      }
+
+      if (typeof markConfigModified === "function") {
+        markConfigModified("savedFilterLayouts");
+        markConfigModified("sidebarFacets");
+      }
+      if (typeof syncWithCloudNow === "function") {
+        syncWithCloudNow(false);
       }
 
       const bar = document.getElementById("viewModificationBar");
@@ -15942,6 +16066,17 @@ function initializeLabErpApp() {
       container.innerHTML = "";
 
       syncAllColumnsFromTemplateFields();
+      loadSavedFilterLayoutsFromStorage();
+
+      // Hedef filtrenin daha önceden kaydedilmiş özel gizli sütunları varsa onları baz al
+      const facetObj = (SIDEBAR_FACET_FIELDS || []).find(f => f.id === facetId);
+      const facetLayout = (facetId && SAVED_FILTER_LAYOUTS[facetId]) ? SAVED_FILTER_LAYOUTS[facetId] : null;
+      let targetHidden = hiddenColumns || [];
+      if (facetLayout && Array.isArray(facetLayout.hiddenColumns)) {
+        targetHidden = facetLayout.hiddenColumns;
+      } else if (facetObj && Array.isArray(facetObj.hiddenColumns) && facetObj.hiddenColumns.length > 0) {
+        targetHidden = facetObj.hiddenColumns;
+      }
 
       // Kategorilere göre grupla
       const groups = {};
@@ -15966,7 +16101,7 @@ function initializeLabErpApp() {
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5" data-category="${escapeHtml(catName)}">
             ${cols.map(c => {
-              const isChecked = !hiddenColumns.includes(c.key);
+              const isChecked = !targetHidden.includes(c.key);
               return `
                 <label class="flex items-center space-x-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer select-none text-[11px] truncate" title="${escapeHtml(c.label)}">
                   <input type="checkbox" value="${c.key}" ${isChecked ? 'checked' : ''} onchange="updateCustomizerActiveCount()" class="cust-col-cb rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer">
@@ -16142,7 +16277,11 @@ function initializeLabErpApp() {
       }
 
       applyTableFilters();
-      if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
+      if (typeof markConfigModified === "function") {
+        markConfigModified("savedFilterLayouts");
+        markConfigModified("sidebarFacets");
+      }
+      if (typeof syncWithCloudNow === "function") syncWithCloudNow(false);
 
       if (typeof hideAllFacetActionBars === "function") hideAllFacetActionBars();
       isCurrentViewModified = false;
