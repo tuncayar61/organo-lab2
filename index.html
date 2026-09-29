@@ -766,6 +766,7 @@
       background: #94a3b8;
     }
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased h-screen overflow-hidden flex flex-col">
 
@@ -1153,6 +1154,16 @@
 
           <!-- Sağ Kısım: Podio Tarzı "Görünümü Kaydet", "Farklı Kaydet" ve "Geri Al" Butonları -->
           <div class="flex items-center space-x-1.5">
+            <!-- Excel İçe Aktar Butonu -->
+            <button type="button" onclick="openExcelImportModal()" class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1.5 transition cursor-pointer" title="Excel (.xlsx, .xls) veya CSV dosyasından analiz kayıtlarını içe aktarın">
+              <i class="fa-solid fa-file-import text-emerald-600 text-xs"></i>
+              <span>Excel Yükle</span>
+            </button>
+            <!-- Genel Hammadde Ayarları Butonu (Yeni Kayıtlar İçin Varsayılan) -->
+            <button id="btnGlobalRawMaterialsConfig" type="button" onclick="openRawMaterialsConfigModal(null, true)" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-900 border border-amber-300 rounded font-semibold text-xs shadow-2xs flex items-center gap-1.5 transition cursor-pointer" title="Yeni açılacak analiz kayıtlarında varsayılan olarak kullanılacak genel hammadde içerik oranlarını ve katsayılarını belirleyin">
+              <i class="fa-solid fa-sliders text-amber-600 text-xs"></i>
+              <span>Genel Hammadde Ayarları</span>
+            </button>
             <!-- Kaydet Butonu (Değişiklik olduğunda görünür) -->
             <button id="btnSaveCurrentView" type="button" onclick="saveCurrentViewChanges()" class="hidden px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded font-bold text-xs shadow-xs items-center gap-1 transition cursor-pointer" title="Mevcut Görünümü Tüm Tablo Biçimi ve Filtrelerle Güncelle">
               <i class="fa-solid fa-floppy-disk text-amber-300 text-xs"></i>
@@ -3362,6 +3373,105 @@
 
 
 
+
+  <!-- MODAL: EXCEL & CSV İÇE AKTAR / YÜKLE (IMPORT) -->
+  <div id="excelImportModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 hidden" style="z-index: 100005 !important;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Header -->
+      <div class="px-6 py-4 bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 text-white flex justify-between items-center border-b border-emerald-800/40 shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center text-lg shadow-inner">
+            <i class="fa-solid fa-file-excel"></i>
+          </div>
+          <div>
+            <h3 class="font-black text-sm md:text-base tracking-tight text-white flex items-center gap-2">
+              <span>Excel Dosyasından Analiz Verisi İçe Aktar (Import)</span>
+              <span class="text-[10px] bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 px-2 py-0.5 rounded-full font-mono font-bold">.xlsx / .xls / .csv</span>
+            </h3>
+            <p class="text-[11px] text-emerald-200/80">Excel veya CSV tablonuzdaki analiz sonuçlarını ERP veritabanına otomatik aktarın.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeExcelImportModal()" class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs bg-slate-50/50">
+        <!-- Dosya Yükleme Alanı -->
+        <div id="excelImportDropZone" class="p-6 border-2 border-dashed border-emerald-400 hover:border-emerald-600 rounded-2xl bg-emerald-50/40 hover:bg-emerald-50/80 text-center transition cursor-pointer" onclick="document.getElementById('excelImportFileInput').click()" ondragover="event.preventDefault(); this.classList.add('border-emerald-600', 'bg-emerald-100/50');" ondragleave="this.classList.remove('border-emerald-600', 'bg-emerald-100/50');" ondrop="handleExcelDrop(event)">
+          <input type="file" id="excelImportFileInput" accept=".xlsx,.xls,.csv" onchange="handleExcelImportFileSelected(event)" class="hidden">
+          <div class="flex flex-col items-center justify-center space-y-2">
+            <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shadow-xs">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div>
+              <span class="text-sm font-bold text-emerald-950">Excel veya CSV Dosyasını Buraya Sürükleyin</span>
+              <span class="text-xs text-slate-500 block mt-0.5">veya bilgisayarınızdan dosya seçmek için tıklayın (.xlsx, .xls, .csv)</span>
+            </div>
+            <div class="text-[10.5px] text-emerald-800 bg-white px-3 py-1 rounded-full border border-emerald-200 font-medium">
+              💡 Tarih, Ürün Adı, Parti No, N-P-K, SO3, Nem, pH, Elek ve diğer tüm kolonlar otomatik algılanır.
+            </div>
+          </div>
+        </div>
+
+        <!-- Yüklenen Dosya Bilgisi & Önizleme Alanı -->
+        <div id="excelImportPreviewContainer" class="hidden space-y-3">
+          <div class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <i class="fa-solid fa-file-excel text-emerald-600 text-xl"></i>
+              <div>
+                <span id="excelImportFileName" class="font-bold text-slate-800 text-xs block">dosya.xlsx</span>
+                <span id="excelImportRowCount" class="text-[10.5px] text-slate-500">0 satır veri bulundu</span>
+              </div>
+            </div>
+            <button type="button" onclick="document.getElementById('excelImportFileInput').click()" class="text-xs text-emerald-700 hover:underline font-bold cursor-pointer">Farklı Dosya Seç</button>
+          </div>
+
+          <!-- Sütun Eşleştirme Kartı -->
+          <div class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <span class="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-diagram-project text-blue-600"></i> Otomatik Sütun Eşleşmeleri
+              </span>
+              <span class="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold" id="excelImportMappedCount">0 sütun eşleşti</span>
+            </div>
+            <div id="excelImportMappingChips" class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1">
+              <!-- Dinamik eşleşme etiketleri -->
+            </div>
+          </div>
+
+          <!-- Veri Önizleme Tablosu -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+            <div class="p-2.5 bg-slate-100 border-b border-slate-200 font-bold text-slate-700 text-xs flex justify-between items-center">
+              <span>İlk 5 Satır Önizleme</span>
+              <span class="text-[10px] text-slate-500 font-normal">Sisteme eklenmeden önceki kontrol</span>
+            </div>
+            <div class="overflow-x-auto max-h-48">
+              <table id="excelImportPreviewTable" class="w-full text-[11px] text-left border-collapse">
+                <!-- Önizleme Satırları -->
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
+        <button type="button" onclick="closeExcelImportModal()" class="px-4 py-2 bg-white hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition cursor-pointer">
+          Vazgeç
+        </button>
+        <button type="button" id="btnConfirmExcelImport" onclick="executeExcelImport()" disabled class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span id="btnConfirmExcelImportText">Verileri Sisteme Aktar</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- 5. MODAL: SİSTEM TANIMLAMALARI VE VERİ GİRİŞ AYARLARI -->
   <div id="masterDataModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 hidden">
     <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
@@ -4638,19 +4748,7 @@
 
           let mergedUrunList = Array.from(new Set([...URUN_LIST, ...((remoteDb && remoteDb.urunList) || [])]));
 
-          const bundleToPush = {
-            records: mergedRecords,
-            deletedRecords: deletedRecords || [],
-            productCards: mergedProductCards,
-            urunList: mergedUrunList,
-            hatList: HAT_LIST,
-            gozList: GOZ_LIST,
-            personelList: PERSONEL_LIST,
-            vardiyaList: VARDIYA_LIST,
-            usersList: usersList,
-            roleTemplates: roleTemplates,
-            lastUpdated: new Date().toISOString()
-          };
+          const bundleToPush = buildFullCloudSyncBundle(mergedRecords);
 
           const safeStorePayload = {
             payload: JSON.stringify(bundleToPush),
@@ -4678,19 +4776,37 @@
         });
     }
 
-    function pushLocalToFirebase(isUserInitiated = false) {
-      const bundleToPush = {
-        records: labRecords,
+    function buildFullCloudSyncBundle(recordsToInclude) {
+      return {
+        records: recordsToInclude || labRecords || [],
+        deletedRecords: deletedRecords || [],
         productCards: (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}),
-        urunList: URUN_LIST,
-        hatList: HAT_LIST,
-        gozList: GOZ_LIST,
-        personelList: PERSONEL_LIST,
-        vardiyaList: VARDIYA_LIST,
-        usersList: usersList,
-        roleTemplates: roleTemplates,
+        rawMaterialSpecs: (typeof RAW_MATERIAL_SPECS !== "undefined" && RAW_MATERIAL_SPECS ? RAW_MATERIAL_SPECS : (typeof DEFAULT_RAW_MATERIAL_SPECS !== "undefined" ? DEFAULT_RAW_MATERIAL_SPECS : {})),
+        templateFields: (typeof templateFields !== "undefined" ? templateFields : []),
+        customFields: (typeof customFields !== "undefined" ? customFields : []),
+        sidebarFacets: (typeof SIDEBAR_FACET_FIELDS !== "undefined" ? SIDEBAR_FACET_FIELDS : []),
+        savedFilterLayouts: (typeof SAVED_FILTER_LAYOUTS !== "undefined" ? SAVED_FILTER_LAYOUTS : {}),
+        savedViews: (typeof savedViews !== "undefined" ? savedViews : []),
+        requiredFieldsConfig: (typeof requiredFieldsConfig !== "undefined" ? requiredFieldsConfig : {}),
+        urunList: (typeof URUN_LIST !== "undefined" ? URUN_LIST : []),
+        hatList: (typeof HAT_LIST !== "undefined" ? HAT_LIST : []),
+        gozList: (typeof GOZ_LIST !== "undefined" ? GOZ_LIST : []),
+        personelList: (typeof PERSONEL_LIST !== "undefined" ? PERSONEL_LIST : []),
+        vardiyaList: (typeof VARDIYA_LIST !== "undefined" ? VARDIYA_LIST : []),
+        turList: (typeof TUR_LIST !== "undefined" ? TUR_LIST : []),
+        surecList: (typeof SUREC_LIST !== "undefined" ? SUREC_LIST : []),
+        uygunlukList: (typeof UYGUNLUK_LIST !== "undefined" ? UYGUNLUK_LIST : []),
+        usersList: (typeof usersList !== "undefined" ? usersList : []),
+        roleTemplates: (typeof roleTemplates !== "undefined" ? roleTemplates : []),
+        hiddenColumns: (typeof hiddenColumns !== "undefined" ? hiddenColumns : []),
+        customColWidths: (typeof CUSTOM_COL_WIDTHS !== "undefined" ? CUSTOM_COL_WIDTHS : {}),
+        pinnedColumns: (typeof pinnedColumns !== "undefined" ? pinnedColumns : []),
         lastUpdated: new Date().toISOString()
       };
+    }
+
+    function pushLocalToFirebase(isUserInitiated = false) {
+      const bundleToPush = buildFullCloudSyncBundle(labRecords);
 
       const safeStorePayload = {
         payload: JSON.stringify(bundleToPush),
@@ -4769,14 +4885,105 @@
           const hadChanges = (addedCount > 0 || changedCount > 0 || mergedRecords.length !== labRecords.length);
           labRecords = mergedRecords;
 
+          // 1. Ürün Kartları Senkronizasyonu
           if (db.productCards && Object.keys(db.productCards).length > 0) {
-            // Yerel kartları koruyarak buluttan gelen yeni kartları ekle (yerel güncellemeler ezilmez)
-            PRODUCT_CARDS = Object.assign({}, db.productCards, PRODUCT_CARDS);
+            PRODUCT_CARDS = Object.assign({}, PRODUCT_CARDS, db.productCards);
             SafeStorage.setItem("LAB_ERP_PRODUCT_CARDS", JSON.stringify(PRODUCT_CARDS));
           }
+
+          // 2. Hammadde İçerikleri ve Katsayıları Senkronizasyonu (RAW_MATERIAL_SPECS)
+          if (db.rawMaterialSpecs && typeof db.rawMaterialSpecs === "object" && Object.keys(db.rawMaterialSpecs).length > 0) {
+            RAW_MATERIAL_SPECS = Object.assign({}, DEFAULT_RAW_MATERIAL_SPECS, db.rawMaterialSpecs);
+            SafeStorage.setItem("LAB_ERP_RAW_MATERIAL_SPECS", JSON.stringify(RAW_MATERIAL_SPECS));
+            if (typeof updateK2OSourceOptionsText === "function") updateK2OSourceOptionsText();
+            if (typeof updateP2O5SourceOptionsText === "function") updateP2O5SourceOptionsText();
+            if (typeof loadMasterTabRawMaterialSpecs === "function") loadMasterTabRawMaterialSpecs();
+          }
+
+          // 3. Şablon Alanları & Ebatları Senkronizasyonu (templateFields & customFields)
+          if (Array.isArray(db.templateFields) && db.templateFields.length > 0) {
+            templateFields = db.templateFields;
+            SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+            customFields = templateFields.filter(f => !f.isStandard && f.enabled);
+            SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
+            if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
+            if (typeof syncAllFormLabelsFromTemplateFields === "function") syncAllFormLabelsFromTemplateFields();
+            if (typeof renderTableHeaders === "function") renderTableHeaders();
+            if (typeof applyAllFieldColSpans === "function") applyAllFieldColSpans();
+            if (typeof renderCustomFieldsInEntryModal === "function") renderCustomFieldsInEntryModal();
+          }
+
+          // 4. Filtre Alanları Senkronizasyonu (sidebarFacets)
+          if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
+            SIDEBAR_FACET_FIELDS = db.sidebarFacets;
+            SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
+            if (typeof renderSidebarFacetSectionsDOM === "function") renderSidebarFacetSectionsDOM();
+          }
+
+          // 5. Özelleştirilmiş Filtre Düzenleri & Görünümler Senkronizasyonu
+          if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
+            SAVED_FILTER_LAYOUTS = Object.assign({}, SAVED_FILTER_LAYOUTS, db.savedFilterLayouts);
+            SafeStorage.setItem("LAB_ERP_SAVED_FILTER_LAYOUTS", JSON.stringify(SAVED_FILTER_LAYOUTS));
+          }
+          if (Array.isArray(db.savedViews) && db.savedViews.length > 0) {
+            const viewMap = new Map();
+            (savedViews || []).forEach(v => { if (v && v.id) viewMap.set(v.id, v); });
+            db.savedViews.forEach(v => { if (v && v.id) viewMap.set(v.id, v); });
+            savedViews = Array.from(viewMap.values());
+            SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
+            if (typeof renderSavedViewsList === "function") renderSavedViewsList();
+          }
+
+          // 6. Zorunlu Alan Kuralları Senkronizasyonu
+          if (db.requiredFieldsConfig && typeof db.requiredFieldsConfig === "object") {
+            requiredFieldsConfig = Object.assign({}, requiredFieldsConfig, db.requiredFieldsConfig);
+            SafeStorage.setItem("LAB_ERP_REQUIRED_FIELDS", JSON.stringify(requiredFieldsConfig));
+            if (typeof updateRequiredStars === "function") updateRequiredStars();
+          }
+
+          // 7. Master Tanımlama Listeleri Senkronizasyonu
           if (Array.isArray(db.urunList) && db.urunList.length > 0) {
             URUN_LIST = Array.from(new Set([...URUN_LIST, ...db.urunList]));
             SafeStorage.setItem("LAB_ERP_URUN_LIST", JSON.stringify(URUN_LIST));
+          }
+          if (Array.isArray(db.hatList) && db.hatList.length > 0) {
+            HAT_LIST = Array.from(new Set([...HAT_LIST, ...db.hatList]));
+            SafeStorage.setItem("LAB_ERP_HAT_LIST", JSON.stringify(HAT_LIST));
+          }
+          if (Array.isArray(db.gozList) && db.gozList.length > 0) {
+            GOZ_LIST = Array.from(new Set([...GOZ_LIST, ...db.gozList]));
+            SafeStorage.setItem("LAB_ERP_GOZ_LIST", JSON.stringify(GOZ_LIST));
+          }
+          if (Array.isArray(db.personelList) && db.personelList.length > 0) {
+            PERSONEL_LIST = Array.from(new Set([...PERSONEL_LIST, ...db.personelList]));
+            SafeStorage.setItem("LAB_ERP_PERSONEL_LIST", JSON.stringify(PERSONEL_LIST));
+          }
+          if (Array.isArray(db.vardiyaList) && db.vardiyaList.length > 0) {
+            VARDIYA_LIST = Array.from(new Set([...VARDIYA_LIST, ...db.vardiyaList]));
+            SafeStorage.setItem("LAB_ERP_VARDIYA_LIST", JSON.stringify(VARDIYA_LIST));
+          }
+          if (Array.isArray(db.turList) && db.turList.length > 0 && typeof TUR_LIST !== "undefined") {
+            TUR_LIST = Array.from(new Set([...TUR_LIST, ...db.turList]));
+            SafeStorage.setItem("LAB_ERP_TUR_LIST", JSON.stringify(TUR_LIST));
+          }
+          if (Array.isArray(db.surecList) && db.surecList.length > 0 && typeof SUREC_LIST !== "undefined") {
+            SUREC_LIST = Array.from(new Set([...SUREC_LIST, ...db.surecList]));
+            SafeStorage.setItem("LAB_ERP_SUREC_LIST", JSON.stringify(SUREC_LIST));
+          }
+          if (Array.isArray(db.uygunlukList) && db.uygunlukList.length > 0 && typeof UYGUNLUK_LIST !== "undefined") {
+            UYGUNLUK_LIST = Array.from(new Set([...UYGUNLUK_LIST, ...db.uygunlukList]));
+            SafeStorage.setItem("LAB_ERP_UYGUNLUK_LIST", JSON.stringify(UYGUNLUK_LIST));
+          }
+          if (typeof refreshAllDropdowns === "function") refreshAllDropdowns();
+
+          // 8. Roller ve Kullanıcı Yetkileri Senkronizasyonu
+          if (Array.isArray(db.usersList) && db.usersList.length > 0) {
+            usersList = db.usersList;
+            if (typeof saveUsersToStorage === "function") saveUsersToStorage();
+          }
+          if (Array.isArray(db.roleTemplates) && db.roleTemplates.length > 0) {
+            roleTemplates = db.roleTemplates;
+            if (typeof saveRoleTemplatesToStorage === "function") saveRoleTemplatesToStorage();
           }
 
           // Yerel depoya kaydet ve tabloyu tazele
@@ -6618,6 +6825,7 @@
     function saveRoleTemplatesToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_ROLE_TEMPLATES", JSON.stringify(roleTemplates));
+        if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
       } catch(e) {
         console.error("saveRoleTemplates error:", e);
       }
@@ -7101,6 +7309,7 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         if (activeUser) {
           SafeStorage.setItem("LAB_ERP_ACTIVE_USER_ID", activeUser.id);
         }
+        if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
       } catch(e) {
         console.error("saveUsers error:", e);
       }
@@ -12748,7 +12957,7 @@ function openTableModifierModal(e) {
           if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 
           const targetContainer = e.target.closest(".live-modifier-highlight");
-          if (targetContainer && targetContainer !== container && targetContainer.parentNode === container.parentNode) {
+          if (targetContainer && targetContainer !== container) {
             const rect = targetContainer.getBoundingClientRect();
             const mouseY = e.clientY;
             const isAbove = (container.compareDocumentPosition(targetContainer) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -14521,6 +14730,7 @@ function initializeLabErpApp() {
     function saveViewsToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
+        if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
       } catch (e) {
         console.error("Storage save error:", e);
       }
@@ -15446,6 +15656,7 @@ function initializeLabErpApp() {
     function saveSavedFilterLayoutsToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_FILTER_LAYOUTS", JSON.stringify(SAVED_FILTER_LAYOUTS));
+        if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
       } catch(e) {}
     }
 
@@ -15864,6 +16075,7 @@ function initializeLabErpApp() {
       const title = document.getElementById("custFacetTitleInput")?.value.trim() || "Özel Görünüm";
       const facetId = document.getElementById("custFacetIdHidden")?.value;
       const facetVal = document.getElementById("custFacetValHidden")?.value;
+      const facetName = document.getElementById("custFacetNameHidden")?.value || title;
 
       // Hangi sütunlar gizlenecek?
       const newHiddenCols = [];
@@ -15885,33 +16097,57 @@ function initializeLabErpApp() {
       newFilters.f_goz = document.getElementById("cust_f_goz")?.value || "ALL";
       newFilters.f_vardiya = document.getElementById("cust_f_vardiya")?.value || "ALL";
 
-      const newId = "view_" + Date.now();
-      const newView = {
-        id: newId,
-        title: title.startsWith("🌾") ? title : `🌾 ${title}`,
-        isDefault: false,
-        filters: newFilters,
-        hiddenColumns: newHiddenCols,
-        pinnedColumns: [...pinnedColumns],
+      // 1. İlgili filtre alanının (facet) özel sütun ve filtre düzenini güncelle (ASLA YENİ FİLTRE YARATMA!)
+      const layoutData = {
+        hiddenColumns: [...newHiddenCols],
         columnWidths: Object.assign({}, CUSTOM_COL_WIDTHS),
-        sort: Object.assign({}, currentSort)
+        savedFilters: newFilters
       };
 
-      savedViews.push(newView);
-      activeSavedViewId = newId;
-      SafeStorage.setItem("LAB_ERP_ACTIVE_VIEW_ID", newId);
-      saveViewsToStorage();
+      if (facetVal && facetVal !== "ALL") {
+        SAVED_FILTER_LAYOUTS[`${facetId}::${facetVal}`] = layoutData;
+      }
+      if (facetId) {
+        SAVED_FILTER_LAYOUTS[facetId] = layoutData;
+      }
+      saveSavedFilterLayoutsToStorage();
 
-      // Görünümü anında uygula
+      const facet = (SIDEBAR_FACET_FIELDS || []).find(f => f.id === facetId);
+      if (facet) {
+        facet.hiddenColumns = [...newHiddenCols];
+        facet.savedFilters = newFilters;
+        saveSidebarFacetsToStorage();
+      }
+
+      // 2. Eğer kullanıcı mevcut aktif bir görünümdeyse ve o görünüm özel bir filtreyse o görünümü güncelle
+      const activeView = (savedViews || []).find(v => v.id === activeSavedViewId);
+      if (activeView && !activeView.isDefault) {
+        activeView.hiddenColumns = [...newHiddenCols];
+        activeView.filters = Object.assign({}, activeView.filters || {}, newFilters);
+        saveViewsToStorage();
+        if (typeof renderSavedViewsList === "function") renderSavedViewsList();
+      }
+
+      // 3. Görünümü ve filtreleri anında tabloya uygula
       hiddenColumns = [...newHiddenCols];
       saveHiddenColumnsToStorage();
       applyColumnVisibility();
-      applySavedView(newId, false);
+
+      if (document.getElementById("f_baz") && newFilters.f_baz !== "ALL") document.getElementById("f_baz").value = newFilters.f_baz;
+      if (document.getElementById("f_hat") && newFilters.f_hat !== "ALL") document.getElementById("f_hat").value = newFilters.f_hat;
+      if (document.getElementById("f_goz") && newFilters.f_goz !== "ALL") document.getElementById("f_goz").value = newFilters.f_goz;
+      if (document.getElementById("f_vardiya") && newFilters.f_vardiya !== "ALL") document.getElementById("f_vardiya").value = newFilters.f_vardiya;
+      if (facetId && facetVal && facetVal !== "ALL") {
+        if (typeof setFacetFilterValue === "function") setFacetFilterValue(facetId, facetVal);
+      }
+
+      applyTableFilters();
+      if (typeof triggerCloudSyncDebounced === "function") triggerCloudSyncDebounced();
 
       if (typeof hideAllFacetActionBars === "function") hideAllFacetActionBars();
       isCurrentViewModified = false;
       closeCustomizeFacetViewModal();
-      showToastNotification(`"${newView.title}" özel görünümü oluşturuldu ve tabloya uygulandı.`);
+      showToastNotification(`"${facetName}" filtre alanı seçimlerinize göre güncellendi ve uygulandı.`);
     }
 
     
@@ -21029,6 +21265,408 @@ let forceShowAllNutrients = false;
 
 
     
+    
+    // ========================================================
+    // EXCEL & CSV İÇE AKTAR (IMPORT) MOTORU (.xlsx, .xls, .csv)
+    // ========================================================
+    let pendingImportRows = [];
+    let pendingImportMappings = {};
+
+    function openExcelImportModal() {
+      const modal = document.getElementById("excelImportModal");
+      if (modal) {
+        modal.classList.remove("hidden");
+        modal.style.display = "flex";
+      }
+    }
+
+    function closeExcelImportModal() {
+      const modal = document.getElementById("excelImportModal");
+      if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+      }
+      pendingImportRows = [];
+      pendingImportMappings = {};
+      const btn = document.getElementById("btnConfirmExcelImport");
+      if (btn) btn.disabled = true;
+      const prev = document.getElementById("excelImportPreviewContainer");
+      if (prev) prev.classList.add("hidden");
+      const drop = document.getElementById("excelImportDropZone");
+      if (drop) drop.classList.remove("hidden");
+      const fileInput = document.getElementById("excelImportFileInput");
+      if (fileInput) fileInput.value = "";
+    }
+
+    function handleExcelDrop(e) {
+      e.preventDefault();
+      const dropZone = document.getElementById("excelImportDropZone");
+      if (dropZone) dropZone.classList.remove("border-emerald-600", "bg-emerald-100/50");
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        processImportFile(dt.files[0]);
+      }
+    }
+
+    function handleExcelImportFileSelected(e) {
+      if (e.target && e.target.files && e.target.files.length > 0) {
+        processImportFile(e.target.files[0]);
+      }
+    }
+
+    function parseCSVTextToJSON(text) {
+      const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+      if (lines.length < 2) return [];
+      const firstLine = lines[0];
+      let delimiter = ",";
+      if ((firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length) {
+        delimiter = ";";
+      } else if ((firstLine.match(/\t/g) || []).length > (firstLine.match(/,/g) || []).length) {
+        delimiter = "\t";
+      }
+
+      const parseRow = (line) => {
+        const cells = [];
+        let insideQuotes = false;
+        let currentCell = "";
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (c === '"') {
+            insideQuotes = !insideQuotes;
+          } else if (c === delimiter && !insideQuotes) {
+            cells.push(currentCell.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+            currentCell = "";
+          } else {
+            currentCell += c;
+          }
+        }
+        cells.push(currentCell.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+        return cells;
+      };
+
+      const headers = parseRow(lines[0]);
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseRow(lines[i]);
+        if (values.some(v => v !== "")) {
+          const obj = {};
+          headers.forEach((h, idx) => {
+            obj[h] = values[idx] !== undefined ? values[idx] : "";
+          });
+          rows.push(obj);
+        }
+      }
+      return rows;
+    }
+
+    function processImportFile(file) {
+      if (!file) return;
+      const fileName = file.name || "dosya.xlsx";
+      const ext = fileName.split(".").pop().toLowerCase();
+
+      const reader = new FileReader();
+
+      if (ext === "csv") {
+        reader.onload = function(e) {
+          try {
+            const text = e.target.result;
+            const rows = parseCSVTextToJSON(text);
+            setupImportPreview(rows, fileName);
+          } catch(err) {
+            console.error("CSV parse error:", err);
+            alert("CSV dosyası okunamadı: " + err.message);
+          }
+        };
+        reader.readAsText(file, "UTF-8");
+      } else {
+        reader.onload = function(e) {
+          try {
+            if (typeof XLSX !== "undefined") {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+              setupImportPreview(jsonRows, fileName);
+            } else {
+              alert("Excel kitaplığı (SheetJS) henüz yüklenemedi. Lütfen dosyayı .csv olarak kaydedip yükleyin veya sayfayı yenileyin.");
+            }
+          } catch(err) {
+            console.error("Excel parse error:", err);
+            alert("Excel dosyası okunurken hata oluştu: " + err.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function normalizeHeaderKey(str) {
+      return String(str || "")
+        .replace(/İ/g, "i").replace(/I/g, "ı")
+        .toLowerCase()
+        .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c")
+        .replace(/[^a-z0-9]/g, "")
+        .trim();
+    }
+
+    const IMPORT_TARGET_FIELDS = [
+      { key: "tarih", label: "Analiz Tarihi", aliases: ["tarih", "analiztarihi", "date", "analiztarih", "tarihi"] },
+      { key: "numuneId", label: "Numune ID", aliases: ["numuneid", "numuneno", "id", "analizno", "raporno", "kod"] },
+      { key: "urunAdi", label: "Ürün Adı", aliases: ["urun", "urunadi", "numune", "numuneadi", "gubre", "gubreadi", "urungubre"] },
+      { key: "parti", label: "Parti / Şarj", aliases: ["parti", "partino", "sarj", "sarjno", "lot", "lotno"] },
+      { key: "hat", label: "Üretim Hattı", aliases: ["hat", "uretimhatti", "uretimhat", "hatno"] },
+      { key: "goz", label: "Göz / Silo", aliases: ["goz", "gozno", "silo", "silono"] },
+      { key: "vardiya", label: "Vardiya", aliases: ["vardiya", "shift"] },
+      { key: "personel", label: "Personel", aliases: ["personel", "analist", "analiziyapan", "yapan"] },
+      { key: "surec", label: "Süreç Durumu", aliases: ["surec", "surecdurumu", "durum", "asama"] },
+      { key: "uygunluk", label: "Kalite Durumu", aliases: ["uygunluk", "kalite", "sonuc", "karar", "onay"] },
+      { key: "nem", label: "Nem (%)", aliases: ["nem", "rutubet", "moisture"] },
+      { key: "km", label: "KM (%)", aliases: ["km", "kurumadde"] },
+      { key: "ph", label: "pH", aliases: ["ph", "phdegeri"] },
+      { key: "topAzot", label: "Toplam Azot (%)", aliases: ["toplamazot", "azot", "topazot", "totaln", "toplamn", "n"] },
+      { key: "nh4N", label: "Amonyum Azotu (%)", aliases: ["amonyum", "amonyumazotu", "nh4", "nh4n"] },
+      { key: "no3N", label: "Nitrat Azotu (%)", aliases: ["nitrat", "nitratazotu", "no3", "no3n"] },
+      { key: "ureN", label: "Üre Azotu (%)", aliases: ["ure", "ureazotu", "uren", "urea"] },
+      { key: "orgN", label: "Organik Azot (%)", aliases: ["organikazot", "orgazot", "orgn"] },
+      { key: "topP2O5", label: "Toplam P2O5 (%)", aliases: ["toplamp2o5", "p2o5", "fosfor", "topp2o5"] },
+      { key: "sudaP2O5", label: "Suda Çöz. P2O5 (%)", aliases: ["sudap2o5", "sudacozunurp2o5", "sudacozp2o5"] },
+      { key: "topK2O", label: "Toplam K2O (%)", aliases: ["toplamk2o", "k2o", "potasyum", "sudak2o", "40sudacozunurk2o"] },
+      { key: "topSO3", label: "Toplam SO3 (%)", aliases: ["toplamso3", "so3", "kukurt", "topso3"] },
+      { key: "sudaSO3", label: "Suda Çöz. SO3 (%)", aliases: ["sudaso3", "sudacozunurso3", "46sudacozunurso3"] },
+      { key: "zn", label: "Çinko (Zn %)", aliases: ["cinko", "zn", "cinkozn"] },
+      { key: "om", label: "Organik Madde (OM %)", aliases: ["organikmadde", "om", "organik"] },
+      { key: "thf", label: "THF (%)", aliases: ["thf", "humik", "humikfulvik", "toplamhumikfulvik"] },
+      { key: "elek_gt4", label: "Elek >4 mm (%)", aliases: ["gt4", "4mm", "elek4", "elek4mm", "buyuk4"] },
+      { key: "elek_3_4", label: "Elek 3-4 mm (%)", aliases: ["34", "34mm", "elek34", "elek34mm"] },
+      { key: "elek_2_3", label: "Elek 2-3 mm (%)", aliases: ["23", "23mm", "elek23", "elek23mm"] },
+      { key: "elek_lt2", label: "Elek <2 mm (%)", aliases: ["lt2", "2mm", "elek2", "elek2mm", "kucuk2"] }
+    ];
+
+    function setupImportPreview(rows, fileName) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        alert("Dosya boş veya veri satırı bulunamadı.");
+        return;
+      }
+
+      pendingImportRows = rows;
+      const fileHeaders = Object.keys(rows[0] || {});
+      const mappings = {};
+
+      fileHeaders.forEach(fh => {
+        const norm = normalizeHeaderKey(fh);
+        const match = IMPORT_TARGET_FIELDS.find(tf => {
+          return tf.aliases.some(alias => norm.includes(alias) || alias.includes(norm));
+        });
+        if (match) {
+          mappings[fh] = match.key;
+        } else {
+          if (Array.isArray(templateFields)) {
+            const cfMatch = templateFields.find(f => !f.isStandard && normalizeHeaderKey(f.label) === norm);
+            if (cfMatch) mappings[fh] = "cf_" + cfMatch.key;
+          }
+        }
+      });
+
+      pendingImportMappings = mappings;
+
+      document.getElementById("excelImportFileName").innerText = fileName;
+      document.getElementById("excelImportRowCount").innerText = `${rows.length} satır analiz verisi okundu`;
+      document.getElementById("excelImportMappedCount").innerText = `${Object.keys(mappings).length} sütun başarıyla eşleştirildi`;
+
+      const chipsContainer = document.getElementById("excelImportMappingChips");
+      if (chipsContainer) {
+        chipsContainer.innerHTML = fileHeaders.map(fh => {
+          const targetKey = mappings[fh];
+          const targetDef = IMPORT_TARGET_FIELDS.find(t => t.key === targetKey);
+          const targetLabel = targetDef ? targetDef.label : (targetKey ? targetKey : "Eşleşmedi (Atlanacak)");
+          const isMatched = !!targetKey;
+          const bg = isMatched ? "bg-emerald-50 text-emerald-900 border-emerald-300" : "bg-slate-100 text-slate-500 border-slate-200";
+          return `
+            <span class="px-2 py-1 rounded-md text-[10.5px] border ${bg} flex items-center gap-1">
+              <span class="font-bold text-slate-800">${escapeHtml(fh)}</span>
+              <i class="fa-solid fa-arrow-right text-[8px] text-slate-400"></i>
+              <span class="font-bold text-emerald-800">${escapeHtml(targetLabel)}</span>
+            </span>
+          `;
+        }).join("");
+      }
+
+      const table = document.getElementById("excelImportPreviewTable");
+      if (table) {
+        let ths = fileHeaders.map(h => `<th class="p-1.5 bg-slate-100 border border-slate-200 font-bold whitespace-nowrap text-slate-700">${escapeHtml(h)}</th>`).join("");
+        let trs = "";
+        rows.slice(0, 5).forEach((r, idx) => {
+          let tds = fileHeaders.map(h => `<td class="p-1.5 border border-slate-200 whitespace-nowrap">${escapeHtml(String(r[h] !== undefined ? r[h] : ""))}</td>`).join("");
+          trs += `<tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}">${tds}</tr>`;
+        });
+        table.innerHTML = `<thead><tr>${ths}</tr></thead><tbody>${trs}</tbody>`;
+      }
+
+      document.getElementById("excelImportDropZone").classList.add("hidden");
+      document.getElementById("excelImportPreviewContainer").classList.remove("hidden");
+      document.getElementById("btnConfirmExcelImport").disabled = false;
+    }
+
+    function parseImportDate(val) {
+      if (!val) return new Date().toISOString().slice(0, 16).replace("T", " ");
+      if (typeof val === "number" && val > 20000 && val < 60000) {
+        const utc_days = Math.floor(val - 25569);
+        const utc_value = utc_days * 86400;
+        const date_info = new Date(utc_value * 1000);
+        return date_info.toISOString().slice(0, 16).replace("T", " ");
+      }
+      const str = String(val).trim();
+      const dmy = str.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2}))?/);
+      if (dmy) {
+        const day = dmy[1].padStart(2, "0");
+        const month = dmy[2].padStart(2, "0");
+        let year = dmy[3];
+        if (year.length === 2) year = "20" + year;
+        const time = (dmy[4] && dmy[5]) ? `${dmy[4].padStart(2, "0")}:${dmy[5].padStart(2, "0")}` : "09:00";
+        return `${year}-${month}-${day} ${time}`;
+      }
+      return str.replace("T", " ").slice(0, 16);
+    }
+
+    function executeExcelImport() {
+      if (!pendingImportRows || pendingImportRows.length === 0) return;
+
+      const authorName = (activeUser && activeUser.name) ? activeUser.name : "Tuncay Ayar";
+      const authorRole = (activeUser && activeUser.roleName) ? activeUser.roleName : (activeUser ? activeUser.role : "Admin");
+      const defaultSpecs = getGlobalRawMaterialSpecs();
+
+      let successCount = 0;
+
+      pendingImportRows.forEach(rawRow => {
+        const mapped = {};
+        const customFieldVals = {};
+
+        Object.keys(rawRow).forEach(colName => {
+          const targetKey = pendingImportMappings[colName];
+          if (targetKey) {
+            if (targetKey.startsWith("cf_")) {
+              const cfActualKey = targetKey.replace("cf_", "");
+              customFieldVals[cfActualKey] = rawRow[colName];
+            } else {
+              mapped[targetKey] = rawRow[colName];
+            }
+          }
+        });
+
+        const newId = getNextUniqueLabRecordId();
+        const turVal = mapped.tur || "ÜRETİM";
+        const dateVal = parseImportDate(mapped.tarih);
+        const autoNId = mapped.numuneId ? String(mapped.numuneId).trim() : generateAutoLabId(turVal, dateVal);
+
+        const nemVal = (mapped.nem !== undefined && mapped.nem !== "") ? parseTRNumber(mapped.nem) : 0;
+        const kmVal = nemVal > 0 ? Math.max(100 - nemVal, 0.01) : (parseTRNumber(mapped.km) || 100);
+
+        const ey = {
+          topAzot: parseTRNumber(mapped.topAzot),
+          nh4N: parseTRNumber(mapped.nh4N),
+          no3N: parseTRNumber(mapped.no3N),
+          ureN: parseTRNumber(mapped.ureN),
+          orgN: parseTRNumber(mapped.orgN),
+          topP2O5: parseTRNumber(mapped.topP2O5),
+          sudaP2O5: parseTRNumber(mapped.sudaP2O5),
+          topK2O: parseTRNumber(mapped.topK2O),
+          topSO3: parseTRNumber(mapped.topSO3),
+          sudaSO3: parseTRNumber(mapped.sudaSO3),
+          zn: parseTRNumber(mapped.zn),
+          om: parseTRNumber(mapped.om),
+          thf: parseTRNumber(mapped.thf),
+          ph: (mapped.ph !== undefined && mapped.ph !== "") ? parseTRNumber(mapped.ph) : null,
+          elek_gt4: (mapped.elek_gt4 !== undefined && mapped.elek_gt4 !== "") ? parseTRNumber(mapped.elek_gt4) : null,
+          elek_3_4: (mapped.elek_3_4 !== undefined && mapped.elek_3_4 !== "") ? parseTRNumber(mapped.elek_3_4) : null,
+          elek_2_3: (mapped.elek_2_3 !== undefined && mapped.elek_2_3 !== "") ? parseTRNumber(mapped.elek_2_3) : null,
+          elek_lt2: (mapped.elek_lt2 !== undefined && mapped.elek_lt2 !== "") ? parseTRNumber(mapped.elek_lt2) : null
+        };
+
+        const prodName = mapped.urunAdi ? String(mapped.urunAdi).trim() : (URUN_LIST[0] || "12.15.5+(10SO3)");
+        if (prodName && !URUN_LIST.includes(prodName)) URUN_LIST.push(prodName);
+
+        const k2oSource = mapped.k2o_source || "KCL";
+        const p2o5Source = mapped.p2o5_source || "DAP";
+
+        const rawMats = computeRawMaterialsFromNutrients({
+          prod: prodName,
+          nem: nemVal,
+          topAzotYas: ey.topAzot,
+          nh4NYas: ey.nh4N,
+          no3NYas: ey.no3N,
+          ureNYas: ey.ureN,
+          topP2O5Yas: ey.topP2O5,
+          topK2OYas: ey.topK2O,
+          topSO3Yas: ey.topSO3,
+          sudaSO3Yas: ey.sudaSO3,
+          k2oSource: k2oSource,
+          p2o5Source: p2o5Source,
+          specs: defaultSpecs
+        });
+
+        const recordObj = {
+          id: newId,
+          numuneId: autoNId,
+          tarih: dateVal,
+          tur: turVal,
+          urunAdi: prodName,
+          hat: mapped.hat || (HAT_LIST[0] || "1. Hat"),
+          goz: mapped.goz || (GOZ_LIST[0] || "1. Göz"),
+          vardiya: mapped.vardiya || (VARDIYA_LIST[0] || "08:00-16:00"),
+          personel: mapped.personel ? [String(mapped.personel).trim()] : (PERSONEL_LIST.slice(0, 1) || ["Ahmet Yılmaz"]),
+          parti: mapped.parti ? String(mapped.parti).trim() : "",
+          surec: mapped.surec || "TAMAMLANDI",
+          uygunluk: mapped.uygunluk || "UYGUN",
+          baz: "KURU",
+          normalite: "0.1000",
+          nem: nemVal,
+          km: kmVal,
+          ph: ey.ph,
+          om: ey.om,
+          thf: ey.thf,
+          elek_gt4: ey.elek_gt4,
+          elek_3_4: ey.elek_3_4,
+          elek_2_3: ey.elek_2_3,
+          elek_lt2: ey.elek_lt2,
+          entered_yas: ey,
+          titration_details: {},
+          custom_fields: customFieldVals,
+          attachments: [],
+          k2o_source: k2oSource,
+          p2o5_source: p2o5Source,
+          raw_material_specs: JSON.parse(JSON.stringify(defaultSpecs)),
+          raw_materials: rawMats,
+          createdBy: authorName,
+          createdAt: new Date().toISOString(),
+          lastModifiedBy: authorName,
+          lastModifiedAt: new Date().toISOString(),
+          history: [{
+            user: authorName,
+            role: authorRole,
+            action: "Excel İçe Aktarma",
+            timestamp: new Date().toISOString(),
+            details: `Excel dosyasından (#${autoNId}) olarak içe aktarıldı.`
+          }]
+        };
+
+        labRecords.unshift(recordObj);
+        successCount++;
+      });
+
+      const jsonStr = JSON.stringify(labRecords);
+      SafeStorage.setItem("LAB_ERP_RECORDS", jsonStr);
+      SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
+      saveMasterDatabaseToStorage();
+
+      if (typeof syncWithCloudNow === "function") {
+        syncWithCloudNow(true);
+      }
+
+      applyTableFilters();
+      closeExcelImportModal();
+      showToastNotification(`Tebrikler! ${successCount} adet analiz kaydı Excel'den başarıyla içe aktarıldı ve buluta eşitlendi.`);
+    }
+
     // ==========================================
     // ŞIK EXCEL DIŞA AKTARMA MOTORU (.XLS - MSO FORMATI)
     // ==========================================
@@ -24627,10 +25265,11 @@ function renderCustomFieldsInEntryModal() {
       const cFizik = document.getElementById("customFields_Fiziksel");
       const cPK = document.getElementById("customFields_PK");
 
-      if (container) container.innerHTML = "";
-      if (cGenel) cGenel.innerHTML = "";
-      if (cFizik) cFizik.innerHTML = "";
-      if (cPK) cPK.innerHTML = "";
+      if (container) { container.innerHTML = ""; container.classList.add("hidden"); }
+      if (cGenel) { cGenel.innerHTML = ""; cGenel.classList.add("hidden"); }
+      if (cFizik) { cFizik.innerHTML = ""; cFizik.classList.add("hidden"); }
+      if (cPK) { cPK.innerHTML = ""; cPK.classList.add("hidden"); }
+      document.querySelectorAll("[id^='wrapper_cf_']").forEach(el => el.remove());
 
       const activeCustoms = templateFields.filter(f => !f.isStandard && f.enabled);
 
@@ -24717,12 +25356,25 @@ function renderCustomFieldsInEntryModal() {
 
         wrapper.id = `wrapper_cf_${cf.key}`;
         
-        let targetContainer = container;
-        if (cf.category === "Genel" && cGenel) targetContainer = cGenel;
-        else if (cf.category === "Fiziksel" && cFizik) targetContainer = cFizik;
-        else if ((cf.category === "Kimyasal" || cf.category === "PK" || cf.category === "Fosfor" || cf.category === "Potasyum" || cf.category === "Kükürt" || cf.category === "İz Element") && cPK) targetContainer = cPK;
+        let targetGrid = null;
+        if (cf.category === "Genel" || cf.category === "Kalite") {
+          const sec = document.getElementById("sectionGenel");
+          targetGrid = sec ? (sec.querySelector(".grid") || sec) : null;
+        } else if (cf.category === "Fiziksel") {
+          const sec = document.getElementById("sectionFiziksel");
+          targetGrid = sec ? (sec.querySelector(".grid") || sec) : null;
+        } else if (cf.category === "Azot") {
+          const sec = document.getElementById("sectionAzot");
+          targetGrid = sec ? (sec.querySelector(".grid") || sec) : null;
+        } else if (["Fosfor", "Potasyum", "Kükürt", "İz Element", "Kimyasal", "PK", "Organik"].includes(cf.category)) {
+          const sec = document.getElementById("sectionPK");
+          targetGrid = sec ? (sec.querySelector(".grid") || sec) : null;
+        } else {
+          const sec = document.getElementById("sectionCustomFields") || document.getElementById("sectionGenel");
+          targetGrid = sec ? (sec.querySelector(".grid") || sec) : null;
+        }
 
-        if (targetContainer) targetContainer.appendChild(wrapper);
+        if (targetGrid) targetGrid.appendChild(wrapper);
       });
 
       applyAllFieldColSpans();
