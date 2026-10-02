@@ -5383,6 +5383,8 @@ const DEFAULT_TEMPLATE_FIELDS = [
         usersList: (typeof usersList !== "undefined" ? usersList : []),
         roleTemplates: (typeof roleTemplates !== "undefined" ? roleTemplates : []),
         hiddenColumns: (typeof hiddenColumns !== "undefined" ? hiddenColumns : []),
+        workspaceApps: (typeof WORKSPACE_APPS !== "undefined" && Array.isArray(WORKSPACE_APPS)) ? [...WORKSPACE_APPS] : [],
+        workspaceAppsBundle: (typeof getAllWorkspaceAppsBundle === "function" ? getAllWorkspaceAppsBundle() : {}),
         customColWidths: (typeof CUSTOM_COL_WIDTHS !== "undefined" ? CUSTOM_COL_WIDTHS : {}),
         pinnedColumns: (typeof pinnedColumns !== "undefined" ? pinnedColumns : [])
       };
@@ -5649,6 +5651,17 @@ const DEFAULT_TEMPLATE_FIELDS = [
             SafeStorage.setItem("LAB_ERP_CATEGORY_OPTION_COLORS", JSON.stringify(window.CATEGORY_CUSTOM_COLORS));
           }
 
+          // 8.0 Aplikasyonlar ve Üst Bar Sıralaması (Workspace Apps)
+          if (db.workspaceAppsBundle && typeof db.workspaceAppsBundle === "object") {
+            if (typeof applyWorkspaceAppsBundle === "function") {
+              applyWorkspaceAppsBundle(db.workspaceAppsBundle);
+            }
+          } else if (Array.isArray(db.workspaceApps) && db.workspaceApps.length > 0) {
+            WORKSPACE_APPS = [...db.workspaceApps];
+            SafeStorage.setItem("PODIO_WORKSPACE_APPS", JSON.stringify(WORKSPACE_APPS));
+            if (typeof renderPodioWorkspaceApps === "function") renderPodioWorkspaceApps();
+          }
+
           // 8.1 Sütun Görünürlüğü (hiddenColumns), Sabitlemeler (pinnedColumns) ve Genişlikler
           if (Array.isArray(db.hiddenColumns)) {
             hiddenColumns = [...db.hiddenColumns];
@@ -5681,6 +5694,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
           if (typeof renderTableHeaders === "function") renderTableHeaders();
           if (typeof applyColumnVisibility === "function") applyColumnVisibility();
           if (typeof renderColumnCheckboxes === "function") renderColumnCheckboxes();
+          if (typeof renderPodioWorkspaceApps === "function") renderPodioWorkspaceApps();
           if (typeof applyAllFieldColSpans === "function") applyAllFieldColSpans();
           if (typeof syncAllFormLabelsFromTemplateFields === "function") syncAllFormLabelsFromTemplateFields();
           if (typeof renderModalBazButtons === "function") renderModalBazButtons();
@@ -9447,8 +9461,67 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
     function savePodioWorkspaceApps() {
       try {
         SafeStorage.setItem("PODIO_WORKSPACE_APPS", JSON.stringify(WORKSPACE_APPS));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified("Aplikasyon Sıralaması / Listesi Güncellemesi");
+          }
+        }
       } catch(e) {
         console.error("savePodioWorkspaceApps error:", e);
+      }
+    }
+
+    function getAllWorkspaceAppsBundle() {
+      const bundle = {
+        apps: (typeof WORKSPACE_APPS !== "undefined" && Array.isArray(WORKSPACE_APPS)) ? [...WORKSPACE_APPS] : [],
+        fields: {},
+        data: {}
+      };
+      if (Array.isArray(WORKSPACE_APPS)) {
+        WORKSPACE_APPS.forEach(app => {
+          if (app && app.id && app.id !== "app_analiz") {
+            try {
+              const f = SafeStorage.getItem("PODIO_APP_FIELDS_" + app.id);
+              if (f) bundle.fields[app.id] = JSON.parse(f);
+            } catch(e) {}
+            try {
+              const d = SafeStorage.getItem("PODIO_APP_DATA_" + app.id);
+              if (d) bundle.data[app.id] = JSON.parse(d);
+            } catch(e) {}
+          }
+        });
+      }
+      return bundle;
+    }
+
+    function applyWorkspaceAppsBundle(bundle) {
+      if (!bundle) return;
+      const apps = Array.isArray(bundle) ? bundle : (bundle.apps || bundle.workspaceApps);
+      if (Array.isArray(apps) && apps.length > 0) {
+        WORKSPACE_APPS = [...apps];
+        SafeStorage.setItem("PODIO_WORKSPACE_APPS", JSON.stringify(WORKSPACE_APPS));
+      }
+      if (bundle.fields && typeof bundle.fields === "object") {
+        Object.keys(bundle.fields).forEach(appId => {
+          try {
+            SafeStorage.setItem("PODIO_APP_FIELDS_" + appId, JSON.stringify(bundle.fields[appId]));
+          } catch(e) {}
+        });
+      }
+      if (bundle.data && typeof bundle.data === "object") {
+        Object.keys(bundle.data).forEach(appId => {
+          try {
+            SafeStorage.setItem("PODIO_APP_DATA_" + appId, JSON.stringify(bundle.data[appId]));
+          } catch(e) {}
+        });
+      }
+      if (typeof renderPodioWorkspaceApps === "function") {
+        renderPodioWorkspaceApps();
+      }
+      if (typeof activeWorkspaceAppId !== "undefined" && activeWorkspaceAppId && activeWorkspaceAppId !== "app_analiz") {
+        if (typeof renderGenericAppTable === "function") renderGenericAppTable(activeWorkspaceAppId);
+        if (typeof renderGenericAppSidebar === "function") renderGenericAppSidebar(activeWorkspaceAppId);
       }
     }
 
