@@ -5356,6 +5356,8 @@ const DEFAULT_TEMPLATE_FIELDS = [
         action: actionDescription,
         records: labRecords, // Otoriter liste
         deletedRecords: deletedRecords || [],
+        deletedFacets: JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]"),
+        deletedViews: JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]"),
         templateFields: templateFields || [],
         sidebarFacets: (typeof SIDEBAR_FACET_FIELDS !== "undefined" ? SIDEBAR_FACET_FIELDS : []),
         savedFilterLayouts: (typeof SAVED_FILTER_LAYOUTS !== "undefined" ? SAVED_FILTER_LAYOUTS : {}),
@@ -5522,84 +5524,77 @@ const DEFAULT_TEMPLATE_FIELDS = [
           return;
         }
 
-        // 1. Silinen kayıtların (tombstone) birleştirilmesi:
-        const allDeletedIds = (typeof getAllTombstoneIds === "function") ? getAllTombstoneIds() : new Set();
-        (db.deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
-        (deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
-
-        // Silinmiş kayıtları uzaktaki listeden çıkar
-        const cleanRemoteRecords = (db.records || []).filter(r => !allDeletedIds.has(String(r.id)));
-        const remoteCount = cleanRemoteRecords.length;
-        const localCount = Array.isArray(labRecords) ? labRecords.length : 0;
-
         const remoteTs = db.timestamp || (db.updatedAt ? new Date(db.updatedAt).getTime() : 0);
         const remoteRev = parseInt(db.revision, 10) || 0;
+        const localCount = Array.isArray(labRecords) ? labRecords.length : 0;
+        const remoteCount = Array.isArray(db.records) ? db.records.length : 0;
 
-        // Otoriterlik ve güncelleme kararı:
-        // - Yerel boşsa (yeni bilgisayar açıldıysa) ve bulutta kayıt varsa -> Bulut KESİNLİKLE esastır!
-        // - Buluttaki güncelleme yerelden yeniyse veya revizyon büyükse -> Bulut esastır!
-        // - Kullanıcı elle "Eşitle" butonuna bastıysa -> Bulut esastır!
-        const isRemoteNewer = (remoteTs > lastLocalMutationTime) || (remoteRev > localDatabaseRevision);
-        const isRemoteAuthoritative = (localCount === 0 && remoteCount > 0) || isRemoteNewer || isUserInitiated;
+        // "EN SON HANGİ CİHAZDA GÜNCELLEME YAPILDIYSA O KALSIN (OTORİTER MASTER MODELİ)"
+        // Uzaktaki güncelleme zamanı yerelden yeniyse VEYA revizyon daha büyükse VEYA yerel boşsa VEYA kullanıcı "Eşitle" dediyse:
+        const isRemoteAuthoritative = (localCount === 0 && remoteCount > 0) ||
+                                      (remoteTs > lastLocalMutationTime) ||
+                                      (remoteRev > localDatabaseRevision) ||
+                                      isUserInitiated;
 
-        // Koruma kuralı: Yerelde 100+ kayıt varken uzakta 0 kayıt görünüyorsa yereli ezme, buluta bas
-        if (localCount > 20 && remoteCount === 0 && !isUserInitiated) {
-          console.warn(`[Bulut Koruma] Yerelde ${localCount} kayıt var, bulut boş. Yerel kayıtlar buluta aktarılıyor.`);
-          pushAuthoritativeMasterToFirebase("Yerel Veritabanını Buluta Koruma Amaçlı Eşitleme");
+        if (!isRemoteAuthoritative) {
+          // Bu cihazdaki yerel durum daha güncel veya eşit. Uzaktaki eski veriyi KESİNLİKLE kabul etme!
           setCloudStatusReady(localCount);
           return;
         }
 
-        // 2. Akıllı Kayıt Birleştirme (Smart Merge):
-        const recordMap = new Map();
-        // Buluttaki temiz kayıtları haritaya ekle
-        cleanRemoteRecords.forEach(r => {
-          if (r && r.id) recordMap.set(String(r.id), r);
-        });
-
-        // Yerelde olup bulutta henüz olmayan kayıtlar varsa koru
-        let localHasUnpushedRecords = false;
-        if (Array.isArray(labRecords)) {
-          labRecords.forEach(locR => {
-            if (!locR || !locR.id || allDeletedIds.has(String(locR.id))) return;
-            const key = String(locR.id);
-            if (!recordMap.has(key)) {
-              recordMap.set(key, locR);
-              localHasUnpushedRecords = true;
-            } else if (!isRemoteAuthoritative) {
-              // Yerel düzenleme daha yeniyse yerel versiyonu koru
-              recordMap.set(key, locR);
-              localHasUnpushedRecords = true;
-            }
-          });
-        }
-
-        const mergedRecords = Array.from(recordMap.values());
-        mergedRecords.sort((a, b) => (b.id || 0) - (a.id || 0));
-
-        const recordsChanged = (mergedRecords.length !== localCount) || 
-          (JSON.stringify(mergedRecords.map(r => r.id)) !== JSON.stringify((labRecords||[]).map(r => r.id))) ||
-          isRemoteAuthoritative;
-
+        // Uzak sunucu daha güncel! Doğrudan otoriter olarak kabul et.
         isApplyingRemoteCloudSync = true;
         try {
-          labRecords = mergedRecords;
+          // 1. Silinen kayıt kara listelerini birleştir
+          const allDeletedIds = (typeof getAllTombstoneIds === "function") ? getAllTombstoneIds() : new Set();
+          (db.deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
+          (deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
+
+          // 2. Silinen filtre kara listesini birleştir
+          let localDelFacets = [];
+          try { localDelFacets = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]"); } catch(e){}
+          const allDelFacets = new Set(localDelFacets);
+          (db.deletedFacets || []).forEach(fId => allDelFacets.add(fId));
+          SafeStorage.setItem("LAB_ERP_DELETED_FACETS", JSON.stringify(Array.from(allDelFacets)));
+
+          // 3. Silinen görünüm kara listesini birleştir
+          let localDelViews = [];
+          try { localDelViews = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]"); } catch(e){}
+          const allDelViews = new Set(localDelViews);
+          (db.deletedViews || []).forEach(vId => allDelViews.add(vId));
+          SafeStorage.setItem("LAB_ERP_DELETED_VIEWS", JSON.stringify(Array.from(allDelViews)));
+
+          // 4. Kayıtları arındır ve doğrudan ata (Eski kayıtları asla birleştirip geri basma!)
+          const cleanRemoteRecords = (db.records || []).filter(r => !allDeletedIds.has(String(r.id)));
+          labRecords = cleanRemoteRecords;
           deletedRecords = Array.isArray(db.deletedRecords) ? db.deletedRecords : (deletedRecords || []);
           saveDeletedRecordsToStorage();
 
-          // Ürün kartları
+          // 5. Filtreleri ve Görünümleri doğrudan ata (Silinmiş olanları filtrele)
+          if (Array.isArray(db.sidebarFacets)) {
+            SIDEBAR_FACET_FIELDS = db.sidebarFacets.filter(f => f && !allDelFacets.has(f.id));
+            SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
+          }
+          if (Array.isArray(db.savedViews)) {
+            savedViews = db.savedViews.filter(v => v && !allDelViews.has(v.id));
+            SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
+          }
+          if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
+            SAVED_FILTER_LAYOUTS = Object.assign({}, db.savedFilterLayouts);
+            saveSavedFilterLayoutsToStorage();
+          }
+
+          // 6. Ürün kartları ve hammadde katsayıları
           if (db.productCards && Object.keys(db.productCards).length > 0) {
             PRODUCT_CARDS = Object.assign({}, PRODUCT_CARDS, db.productCards);
             SafeStorage.setItem("LAB_ERP_PRODUCT_CARDS", JSON.stringify(PRODUCT_CARDS));
           }
-
-          // Hammadde tanımları & katsayıları
           if (db.rawMaterialSpecs && typeof db.rawMaterialSpecs === "object" && Object.keys(db.rawMaterialSpecs).length > 0) {
             RAW_MATERIAL_SPECS = Object.assign({}, (typeof DEFAULT_RAW_MATERIAL_SPECS !== "undefined" ? DEFAULT_RAW_MATERIAL_SPECS : {}), db.rawMaterialSpecs);
             SafeStorage.setItem("LAB_ERP_RAW_MATERIAL_SPECS", JSON.stringify(RAW_MATERIAL_SPECS));
           }
 
-          // Şablon alanları
+          // 7. Şablon alanları (Form modifier açık değilse)
           if (Array.isArray(db.templateFields) && db.templateFields.length > 0 && !(typeof liveFormModifierMode !== "undefined" && liveFormModifierMode)) {
             templateFields = db.templateFields;
             SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
@@ -5607,21 +5602,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
             SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
           }
 
-          // Filtreler & Kayıtlı Görünümler
-          if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
-            SIDEBAR_FACET_FIELDS = db.sidebarFacets;
-            SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
-          }
-          if (db.savedFilterLayouts && typeof db.savedFilterLayouts === "object") {
-            SAVED_FILTER_LAYOUTS = Object.assign({}, db.savedFilterLayouts);
-            saveSavedFilterLayoutsToStorage();
-          }
-          if (Array.isArray(db.savedViews) && db.savedViews.length > 0) {
-            savedViews = db.savedViews;
-            SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
-          }
-
-          // Master listeler
+          // 8. Master listeler
           if (db.masterData && typeof db.masterData === "object") {
             const md = db.masterData;
             if (Array.isArray(md.urunList) && md.urunList.length > 0) URUN_LIST = md.urunList;
@@ -5631,19 +5612,19 @@ const DEFAULT_TEMPLATE_FIELDS = [
             if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = md.vardiyaList;
           }
 
-          // Revizyon & Zaman damgası güncellemesi
-          localDatabaseRevision = Math.max(localDatabaseRevision, remoteRev);
-          lastLocalMutationTime = Math.max(lastLocalMutationTime, remoteTs, Date.now());
+          // 9. Zaman damgası ve revizyon eşitleme
+          localDatabaseRevision = remoteRev;
+          lastLocalMutationTime = remoteTs;
           SafeStorage.setItem("LAB_ERP_DB_REVISION", String(localDatabaseRevision));
           SafeStorage.setItem("LAB_ERP_LAST_ACTION_TS", String(lastLocalMutationTime));
 
-          // Yerel depolara kalıcı kaydet
+          // 10. Kalıcı depolara yaz
           const jsonStr = JSON.stringify(labRecords);
           SafeStorage.setItem("LAB_ERP_RECORDS", jsonStr);
           SafeStorage.setItem("LAB_ERP_RECORDS_V3", jsonStr);
           saveStateToIndexedDb("LAB_ERP_RECORDS", labRecords);
 
-          // UI Yenile
+          // 11. UI Yenile (ASLA VE ASLA BULUTA GERİ PUSH ETME!)
           if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
           if (typeof renderTableHeaders === "function") renderTableHeaders();
           if (typeof applyColumnVisibility === "function") applyColumnVisibility();
@@ -5663,16 +5644,9 @@ const DEFAULT_TEMPLATE_FIELDS = [
           setCloudStatusReady(labRecords.length);
 
           if (isUserInitiated && typeof showToastNotification === "function") {
-            showToastNotification(`Bulut ortak veritabanı ile eşitlendi! (Toplam ${labRecords.length} analiz kaydı aktif)`);
-          } else if (recordsChanged && typeof showToastNotification === "function" && db.action) {
-            showToastNotification(`Diğer bilgisayardan güncel veriler (${db.action}) canlı olarak eşitlendi.`);
-          }
-
-          // Eğer yerelde bulutta olmayan yeni kayıtlar varsa buluta da geri bas
-          if (localHasUnpushedRecords) {
-            setTimeout(() => {
-              pushAuthoritativeMasterToFirebase("Birleşik Veritabanını Buluta Eşitleme");
-            }, 600);
+            showToastNotification(`Bulut ortak veritabanı ile eşitlendi! (${labRecords.length} analiz kaydı)`);
+          } else if (typeof showToastNotification === "function" && db.action) {
+            showToastNotification(`Diğer cihazdaki güncel durum (${db.action}) uygulandı.`);
           }
         } finally {
           setTimeout(() => { isApplyingRemoteCloudSync = false; }, 300);
@@ -6284,40 +6258,36 @@ const DEFAULT_TEMPLATE_FIELDS = [
         const bundle = JSON.parse(el.textContent.trim());
         if (!bundle) return;
 
-        const storedExportTs = SafeStorage.getItem("LAB_ERP_LAST_IMPORTED_EMBEDDED_TS");
-        if (bundle.exportTimestamp && storedExportTs !== bundle.exportTimestamp) {
-          if (Array.isArray(bundle.records) && bundle.records.length > 0) {
-            const localMap = new Map();
-            try {
-              const s = SafeStorage.getItem("LAB_ERP_RECORDS");
-              if (s) {
-                const arr = JSON.parse(s);
-                if (Array.isArray(arr)) arr.forEach(r => localMap.set(r.id, r));
-              }
-            } catch(e){}
-            bundle.records.forEach(r => localMap.set(r.id, r));
-            labRecords = Array.from(localMap.values());
-            saveLabRecordsToStorage();
-          }
-          if (bundle.productCards && Object.keys(bundle.productCards).length > 0) {
-            PRODUCT_CARDS = Object.assign({}, (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}), bundle.productCards);
-            saveProductCardsToStorage();
-          }
-          if (Array.isArray(bundle.urunList) && bundle.urunList.length > 0) {
-            URUN_LIST = bundle.urunList;
-            SafeStorage.setItem("LAB_ERP_URUN_LIST", JSON.stringify(URUN_LIST));
-          }
-          if (Array.isArray(bundle.usersList) && bundle.usersList.length > 0) {
-            usersList = bundle.usersList;
-            saveUsersToStorage();
-          }
-          if (Array.isArray(bundle.roleTemplates) && bundle.roleTemplates.length > 0) {
-            roleTemplates = bundle.roleTemplates;
-            saveRoleTemplatesToStorage();
-          }
-          SafeStorage.setItem("LAB_ERP_LAST_IMPORTED_EMBEDDED_TS", bundle.exportTimestamp);
-          console.log(`[ERP] Gömülü veritabanından ${bundle.records ? bundle.records.length : 0} kayıt başarıyla içe aktarıldı (${bundle.exportTimestamp}).`);
+        // EĞER bu bilgisayarda yerel analiz kayıtları zaten mevcutsa, gömülü dosyadan eski kayıtları ASLA yeniden canlandırma!
+        const existingLocal = SafeStorage.getItem("LAB_ERP_RECORDS");
+        const hasExistingRecords = existingLocal && existingLocal !== "[]" && (Array.isArray(labRecords) && labRecords.length > 0);
+        if (hasExistingRecords) {
+          return;
         }
+
+        const tombstones = (typeof getAllTombstoneIds === "function") ? getAllTombstoneIds() : new Set();
+        if (Array.isArray(bundle.records) && bundle.records.length > 0) {
+          labRecords = bundle.records.filter(r => r && r.id && !tombstones.has(String(r.id)));
+          saveLabRecordsToStorage();
+        }
+        if (bundle.productCards && Object.keys(bundle.productCards).length > 0) {
+          PRODUCT_CARDS = Object.assign({}, (typeof PRODUCT_CARDS !== "undefined" ? PRODUCT_CARDS : {}), bundle.productCards);
+          saveProductCardsToStorage();
+        }
+        if (Array.isArray(bundle.urunList) && bundle.urunList.length > 0) {
+          URUN_LIST = bundle.urunList;
+          SafeStorage.setItem("LAB_ERP_URUN_LIST", JSON.stringify(URUN_LIST));
+        }
+        if (Array.isArray(bundle.usersList) && bundle.usersList.length > 0) {
+          usersList = bundle.usersList;
+          saveUsersToStorage();
+        }
+        if (Array.isArray(bundle.roleTemplates) && bundle.roleTemplates.length > 0) {
+          roleTemplates = bundle.roleTemplates;
+          saveRoleTemplatesToStorage();
+        }
+        SafeStorage.setItem("LAB_ERP_LAST_IMPORTED_EMBEDDED_TS", bundle.exportTimestamp || new Date().toISOString());
+        console.log(`[ERP] Gömülü veritabanından ${bundle.records ? bundle.records.length : 0} kayıt başarıyla içe aktarıldı (${bundle.exportTimestamp}).`);
       } catch(e) {
         console.warn("checkEmbeddedInitialDatabase warning:", e);
       }
@@ -15051,12 +15021,16 @@ async function initializeLabErpApp() {
     }
 
     function loadSidebarFacetsFromStorage() {
+      let delFacets = [];
+      try { delFacets = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]"); } catch(e){}
+      const delSet = new Set(delFacets);
+
       try {
         const stored = SafeStorage.getItem("LAB_ERP_SIDEBAR_FACETS");
         if (stored && stored !== "undefined" && stored !== "null") {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            SIDEBAR_FACET_FIELDS = parsed;
+          if (Array.isArray(parsed)) {
+            SIDEBAR_FACET_FIELDS = parsed.filter(f => f && !delSet.has(f.id));
             return;
           }
         }
@@ -15064,7 +15038,7 @@ async function initializeLabErpApp() {
         console.error("loadSidebarFacets error:", e);
       }
       if (typeof DEFAULT_SIDEBAR_FACETS !== "undefined" && Array.isArray(DEFAULT_SIDEBAR_FACETS)) {
-        SIDEBAR_FACET_FIELDS = JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_FACETS));
+        SIDEBAR_FACET_FIELDS = JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_FACETS)).filter(f => f && !delSet.has(f.id));
       } else {
         SIDEBAR_FACET_FIELDS = [];
       }
@@ -15303,6 +15277,16 @@ async function initializeLabErpApp() {
       delete SIDEBAR_COLLAPSED_FACETS[facetId];
       saveSidebarCollapsedState();
 
+      // Silinen filtre kara listesine ekle (Anti-Resurrection)
+      let deletedFacets = [];
+      try {
+        deletedFacets = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]");
+      } catch(e) {}
+      if (!deletedFacets.includes(facetId)) {
+        deletedFacets.push(facetId);
+        SafeStorage.setItem("LAB_ERP_DELETED_FACETS", JSON.stringify(deletedFacets));
+      }
+
       SIDEBAR_FACET_FIELDS = SIDEBAR_FACET_FIELDS.filter(f => f.id !== facetId);
       saveSidebarFacetsToStorage();
       renderSidebarFacetSectionsDOM();
@@ -15314,7 +15298,6 @@ async function initializeLabErpApp() {
       }
     }
 
-    // Varsayılan Filtre Alanlarını Sıfırlama
     function resetSidebarFacetsToDefault() {
       if (!confirm("Tüm sol panel filtre alanları varsayılan hazır düzene sıfırlansın mı?")) return;
       SIDEBAR_FACET_FIELDS = JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_FACETS));
@@ -15976,11 +15959,18 @@ async function initializeLabErpApp() {
 
     // KAYITLI GÖRÜNÜMLERİ LOCALSTORAGE'DAN YÜKLE
     function loadSavedViewsFromStorage() {
+      let delViews = [];
+      try { delViews = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]"); } catch(e){}
+      const delSetV = new Set(delViews);
+
       try {
         const stored = SafeStorage.getItem("LAB_ERP_SAVED_VIEWS");
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) savedViews = parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            savedViews = parsed.filter(v => v && !delSetV.has(v.id));
+            return;
+          }
         }
       } catch (e) {
         console.error("Storage error:", e);
@@ -17576,12 +17566,23 @@ async function initializeLabErpApp() {
         if (localBuild !== APP_SCHEMA_BUILD_ID) {
           SafeStorage.setItem("LAB_ERP_BUILD_ID", APP_SCHEMA_BUILD_ID);
           
-          if (typeof DEFAULT_SIDEBAR_FACETS !== "undefined") {
-            SIDEBAR_FACET_FIELDS = JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_FACETS));
+          // SADECE ve SADECE yerelde hiç filtre kaydedilmemişse varsayılanları yükle
+          // Kullanıcının sildiği veya özelleştirdiği filtreleri ASLA sıfırlama / yeniden diriltme!
+          const existingFacets = SafeStorage.getItem("LAB_ERP_SIDEBAR_FACETS");
+          if (!existingFacets && typeof DEFAULT_SIDEBAR_FACETS !== "undefined") {
+            let delFacets = [];
+            try { delFacets = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]"); } catch(e){}
+            const delSet = new Set(delFacets);
+            SIDEBAR_FACET_FIELDS = JSON.parse(JSON.stringify(DEFAULT_SIDEBAR_FACETS)).filter(f => f && !delSet.has(f.id));
             SafeStorage.setItem("LAB_ERP_SIDEBAR_FACETS", JSON.stringify(SIDEBAR_FACET_FIELDS));
           }
-          if (typeof DEFAULT_SAVED_VIEWS !== "undefined") {
-            savedViews = JSON.parse(JSON.stringify(DEFAULT_SAVED_VIEWS));
+
+          const existingViews = SafeStorage.getItem("LAB_ERP_SAVED_VIEWS");
+          if (!existingViews && typeof DEFAULT_SAVED_VIEWS !== "undefined") {
+            let delViews = [];
+            try { delViews = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]"); } catch(e){}
+            const delSetV = new Set(delViews);
+            savedViews = JSON.parse(JSON.stringify(DEFAULT_SAVED_VIEWS)).filter(v => v && !delSetV.has(v.id));
             SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews));
           }
           console.log("LAB ERP: Sürüm ve görünüm senkronizasyonu tamamlandı (" + APP_SCHEMA_BUILD_ID + ")");
@@ -17907,6 +17908,15 @@ async function initializeLabErpApp() {
       const v = (savedViews || []).find(x => x.id === viewId);
       if (!v) return;
       if (confirm(`"${v.title}" filtresini silmek istediğinize emin misiniz?`)) {
+        let deletedViews = [];
+        try {
+          deletedViews = JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]");
+        } catch(e) {}
+        if (!deletedViews.includes(viewId)) {
+          deletedViews.push(viewId);
+          SafeStorage.setItem("LAB_ERP_DELETED_VIEWS", JSON.stringify(deletedViews));
+        }
+
         savedViews = savedViews.filter(x => x.id !== viewId);
         if (activeSavedViewId === viewId) {
           activeSavedViewId = "view_all";
@@ -17915,9 +17925,11 @@ async function initializeLabErpApp() {
         }
         saveViewsToStorage();
         if (typeof renderSavedViewsList === "function") renderSavedViewsList();
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Görünüm Silme: " + v.title);
+        if (typeof showToastNotification === "function") showToastNotification(`"${v.title}" görünümü silindi.`);
       }
     }
-    // SÜTUN İĞNELEME / SABİTLEME (PIN COLUMN / FREEZE - OPAK VE KARARLI)
+
     function togglePin(colClass) {
       if (pinnedColumns.includes(colClass)) {
         pinnedColumns = pinnedColumns.filter(c => c !== colClass);
