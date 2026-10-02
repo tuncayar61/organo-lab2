@@ -13268,6 +13268,13 @@ function openTableModifierModal(e) {
     // KATEGORİ ALANLARI SEÇENEK YÖNETİM & SÜRÜKLE-BIRAK SIRALAMA MOTORU
     // ========================================================
     function getCategoryFieldOptions(fieldKey) {
+      // 1. ŞABLON (templateFields) ÖNCELİKLİ: Kullanıcının şablonda belirlediği seçenekler ve sıralama tek gerçektir
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
+      if (f && Array.isArray(f.options) && f.options.length > 0) {
+        return f.options;
+      }
+
+      // 2. Fallback: Şablonda henüz tanımlanmamışsa global master listeler
       if (fieldKey === "tur" && Array.isArray(TUR_LIST)) return TUR_LIST;
       if (fieldKey === "surec" && Array.isArray(SUREC_LIST)) return SUREC_LIST;
       if (fieldKey === "uygunluk" && Array.isArray(UYGUNLUK_LIST)) return UYGUNLUK_LIST;
@@ -13281,13 +13288,9 @@ function openTableModifierModal(e) {
       if (fieldKey === "urun" && Array.isArray(URUN_LIST)) return URUN_LIST;
       if (fieldKey === "baz") {
         if (Array.isArray(BAZ_LIST) && BAZ_LIST.length > 0) return BAZ_LIST;
-        const fBaz = (templateFields || []).find(tf => tf.key === "baz");
-        if (fBaz && Array.isArray(fBaz.options) && fBaz.options.length > 0) return fBaz.options;
         return ["YAŞ", "KURU"];
       }
 
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
-      if (f && Array.isArray(f.options)) return f.options;
       return [];
     }
 
@@ -19843,21 +19846,34 @@ async function initializeLabErpApp() {
           </td>
         `;
       } else if (k === "hat") {
-        const hColor = getCategoryOptionColor("hat", row.hat) || "#f1f5f9";
+        const hatOpts = getCategoryFieldOptions("hat") || HAT_LIST || ["1. Hat", "2. Hat"];
+        let canonicalHat = row.hat || "";
+        if (canonicalHat && Array.isArray(hatOpts)) {
+          const matched = hatOpts.find(o => {
+            if (o.toUpperCase() === String(canonicalHat).toUpperCase()) return true;
+            if (o.replace(/[\s\.\-_]/g, '').toUpperCase() === String(canonicalHat).replace(/[\s\.\-_]/g, '').toUpperCase()) return true;
+            const n1 = String(canonicalHat).replace(/[^0-9]/g, '');
+            const n2 = String(o).replace(/[^0-9]/g, '');
+            return (n1 && n2 && n1 === n2);
+          });
+          if (matched) canonicalHat = matched;
+        }
+
+        const hColor = getCategoryOptionColor("hat", canonicalHat) || "#49afcd";
         const hFg = getContrastTextColor(hColor);
         if (!canEdit) {
           return `
             <td class="py-1 px-1 border-r border-slate-200 text-center ${colClass}">
               <span class="inline-flex items-center px-2 py-0.5 rounded font-semibold text-xs shadow-2xs select-none" style="background-color: ${hColor}; color: ${hFg};">
-                ${row.hat || "-"}
+                ${canonicalHat || "-"}
               </span>
             </td>
           `;
         }
-        let hatOptions = (getCategoryFieldOptions("hat") || HAT_LIST || []).map(h => {
-          const optColor = getCategoryOptionColor("hat", h) || "#f1f5f9";
+        let hatOptions = hatOpts.map(h => {
+          const optColor = getCategoryOptionColor("hat", h) || "#49afcd";
           const optFg = getContrastTextColor(optColor);
-          return `<option value="${h}" style="background-color: ${optColor}; color: ${optFg}; font-weight: 600;" ${row.hat === h ? "selected" : ""}>${h}</option>`;
+          return `<option value="${h}" style="background-color: ${optColor}; color: ${optFg}; font-weight: 600;" ${canonicalHat === h ? "selected" : ""}>${h}</option>`;
         }).join("");
         return `
           <td class="py-1 px-1 border-r border-slate-200 text-center ${colClass}">
@@ -27853,13 +27869,20 @@ function closeModal() {
 
             // Standart 4 kategori tanımlarını senkronize et
             DEFAULT_TEMPLATE_FIELDS.forEach(df => {
-              const existing = templateFields.find(tf => tf.key === df.key);
+              let existing = templateFields.find(tf => tf.key === df.key);
               if (!existing) {
-                templateFields.push(JSON.parse(JSON.stringify(df)));
+                existing = JSON.parse(JSON.stringify(df));
+                templateFields.push(existing);
               } else {
                 existing.category = df.category;
                 if (df.group) existing.group = df.group;
                 if (df.subType) existing.subType = df.subType;
+                if (!existing.options || !Array.isArray(existing.options) || existing.options.length === 0) {
+                  existing.options = JSON.parse(JSON.stringify(df.options || []));
+                }
+                if (!existing.optionsColors || !Array.isArray(existing.optionsColors) || existing.optionsColors.length === 0) {
+                  existing.optionsColors = JSON.parse(JSON.stringify(df.optionsColors || []));
+                }
               }
             });
 
@@ -28037,7 +28060,57 @@ function closeModal() {
       let trUpperVal = upperVal;
       try { trUpperVal = cleanVal.toLocaleUpperCase("tr-TR"); } catch(e) {}
 
-      // 0. Kullanıcının Şablon Alanından bizzat seçtiği özel renkler (Local Storage ve Bellek)
+      // 1. ŞABLON (templateFields) ÖNCELİKLİ KONTROL - SINGLE SOURCE OF TRUTH
+      let f = (templateFields || []).find(x => x.key === fieldKey || x.id === fieldKey);
+      if (!f) {
+        f = (DEFAULT_TEMPLATE_FIELDS || []).find(x => x.key === fieldKey || x.id === fieldKey);
+      }
+
+      if (f) {
+        // A) f.optionColorsMap kontrolü
+        if (f.optionColorsMap && typeof f.optionColorsMap === "object") {
+          if (f.optionColorsMap[cleanVal]) return f.optionColorsMap[cleanVal];
+          if (f.optionColorsMap[upperVal]) return f.optionColorsMap[upperVal];
+          if (f.optionColorsMap[trUpperVal]) return f.optionColorsMap[trUpperVal];
+        }
+
+        // B) f.options & f.optionsColors array kontrolü
+        const opts = Array.isArray(f.options) ? f.options : [];
+        const optColors = Array.isArray(f.optionsColors) ? f.optionsColors : [];
+
+        // B1) Tam ve büyük/küçük harf eşleşmesi
+        let optIdx = opts.findIndex(o => {
+          if (!o) return false;
+          const s = String(o).trim();
+          return s === cleanVal || s.toUpperCase() === upperVal || (trUpperVal && s.toLocaleUpperCase("tr-TR") === trUpperVal);
+        });
+
+        // B2) Esnek eşleşme: Noktalama, boşluk veya sayısal eşleşme (örn: "1.Hat", "1", "Hat 1" -> "1. Hat")
+        if (optIdx === -1) {
+          const normVal = cleanVal.replace(/[\s\.\-_]/g, "").toUpperCase();
+          optIdx = opts.findIndex(o => {
+            if (!o) return false;
+            const normOpt = String(o).replace(/[\s\.\-_]/g, "").toUpperCase();
+            if (normVal === normOpt) return true;
+            // Sayısal eşleşme (örn: "1" veya "Hat 1" ile "1. Hat")
+            const numVal = cleanVal.replace(/[^0-9]/g, "");
+            const numOpt = String(o).replace(/[^0-9]/g, "");
+            if (numVal && numOpt && numVal === numOpt) return true;
+            return false;
+          });
+        }
+
+        if (optIdx !== -1 && optColors[optIdx]) {
+          return optColors[optIdx];
+        }
+
+        // C) Eğer şablonda tek bir renk belirlenmişse veya tüm seçenekler aynı renkteyse (örn: Hat için tek bir renk)
+        if (optColors.length > 0 && optColors.every(c => c && c === optColors[0])) {
+          return optColors[0];
+        }
+      }
+
+      // 2. Kullanıcının Şablon Alanından bizzat seçtiği özel renkler (Local Storage ve Bellek)
       if (window.CATEGORY_CUSTOM_COLORS) {
         const customKey1 = `${fieldKey}___${upperVal}`;
         const customKey2 = `${fieldKey}___${trUpperVal}`;
@@ -28047,33 +28120,7 @@ function closeModal() {
         if (window.CATEGORY_CUSTOM_COLORS[customKey3]) return window.CATEGORY_CUSTOM_COLORS[customKey3];
       }
 
-      // 1. templateFields veya DEFAULT_TEMPLATE_FIELDS içindeki alan kontrolü
-      let f = (templateFields || []).find(x => x.key === fieldKey || x.id === fieldKey);
-      if (!f) {
-        f = (DEFAULT_TEMPLATE_FIELDS || []).find(x => x.key === fieldKey || x.id === fieldKey);
-      }
-
-      if (f) {
-        // A) f.optionColorsMap kontrolü
-        if (f.optionColorsMap) {
-          if (f.optionColorsMap[cleanVal]) return f.optionColorsMap[cleanVal];
-          if (f.optionColorsMap[upperVal]) return f.optionColorsMap[upperVal];
-          if (f.optionColorsMap[trUpperVal]) return f.optionColorsMap[trUpperVal];
-        }
-
-        // B) f.options & f.optionsColors array kontrolü
-        const opts = Array.isArray(f.options) ? f.options : [];
-        const optColors = Array.isArray(f.optionsColors) ? f.optionsColors : [];
-        let optIdx = opts.findIndex(o => {
-          const s = String(o).trim();
-          return s === cleanVal || s.toUpperCase() === upperVal || (trUpperVal && s.toLocaleUpperCase("tr-TR") === trUpperVal);
-        });
-        if (optIdx !== -1 && optColors[optIdx]) {
-          return optColors[optIdx];
-        }
-      }
-
-      // 2. Standart bilinen renk haritaları (her yerde tam bütünlük)
+      // 3. Standart bilinen renk haritaları (Şablonda renk yoksa fallback)
       const stdColorMap = {
         // Uygunluk
         "UYGUN": "#86efac",
@@ -28098,9 +28145,6 @@ function closeModal() {
         "AR-GE": "#e2e8f0",
         "MÜŞTERİ NUMUNESİ": "#a5f3fc",
         "DİĞER": "#fecdd3",
-        // Hat
-        "1. HAT": "#fed7aa",
-        "2. HAT": "#bbf7d0",
         // Vardiya
         "08:00-20:00": "#bae6fd",
         "20:00-08:00": "#c7d2fe"
@@ -28109,7 +28153,7 @@ function closeModal() {
       if (stdColorMap[upperVal]) return stdColorMap[upperVal];
       if (stdColorMap[trUpperVal]) return stdColorMap[trUpperVal];
 
-      // 3. Kararlı renk üretimi (aynı seçenek her zaman aynı renkte görünür)
+      // 4. Kararlı renk üretimi (aynı seçenek her zaman aynı renkte görünür)
       let hash = 0;
       for (let i = 0; i < cleanVal.length; i++) {
         hash = cleanVal.charCodeAt(i) + ((hash << 5) - hash);
@@ -28329,11 +28373,30 @@ function closeModal() {
 
     function setPodioOptionColor(fieldId, optIdx, color, event) {
       if (event) event.stopPropagation();
-      const f = templateFields.find(x => x.id === fieldId);
+      const f = templateFields.find(x => x.id === fieldId || x.key === fieldId);
       if (!f) return;
       f.optionsColors = f.optionsColors || [];
       f.optionsColors[optIdx] = color;
+
+      const optVal = (Array.isArray(f.options) && f.options[optIdx]) ? f.options[optIdx] : null;
+      if (optVal) {
+        if (!f.optionColorsMap) f.optionColorsMap = {};
+        f.optionColorsMap[optVal] = color;
+        f.optionColorsMap[optVal.toUpperCase()] = color;
+        try { f.optionColorsMap[optVal.toLocaleUpperCase("tr-TR")] = color; } catch(e){}
+
+        if (!window.CATEGORY_CUSTOM_COLORS) window.CATEGORY_CUSTOM_COLORS = {};
+        window.CATEGORY_CUSTOM_COLORS[`${f.key}___${optVal.toUpperCase()}`] = color;
+        try {
+          window.CATEGORY_CUSTOM_COLORS[`${f.key}___${optVal.toLocaleUpperCase("tr-TR")}`] = color;
+          SafeStorage.setItem("LAB_ERP_CATEGORY_OPTION_COLORS", JSON.stringify(window.CATEGORY_CUSTOM_COLORS));
+        } catch(e) {}
+      }
+
       saveTemplateFieldsToStorage();
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified("Şablon Seçenek Rengi: " + f.key);
+      }
       renderPodioAppBuilder();
       applyMasterTemplate();
       renderTable((typeof currentFilteredRecords !== "undefined" && currentFilteredRecords) ? currentFilteredRecords : labRecords);
@@ -29650,7 +29713,7 @@ function renderCustomFieldsInEntryModal() {
             return `
               <div class="flex items-center justify-between p-1.5 rounded bg-white border border-slate-200 shadow-2xs">
                 <div class="flex items-center space-x-1.5 min-w-0 mr-1">
-                  <span class="w-3 h-3 rounded-full shrink-0 border border-black/10" style="background-color: ${optColor};"></span>
+                  <button type="button" onclick="openCategoryColorPickerPopover('${fieldKey}', '${safeOpt}', this)" class="cat-color-picker-btn w-4 h-4 rounded-full shrink-0 border border-black/15 shadow-2xs hover:scale-125 transition cursor-pointer" style="background-color: ${optColor};" title="Rengi Değiştir (${optColor})"></button>
                   <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(opt)}</span>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0">
