@@ -5612,6 +5612,21 @@ const DEFAULT_TEMPLATE_FIELDS = [
             if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = md.vardiyaList;
           }
 
+          // 8.1 Sütun Görünürlüğü (hiddenColumns), Sabitlemeler (pinnedColumns) ve Genişlikler
+          if (Array.isArray(db.hiddenColumns)) {
+            hiddenColumns = [...db.hiddenColumns];
+            SafeStorage.setItem("LAB_ERP_HIDDEN_COLUMNS", JSON.stringify(hiddenColumns));
+            SafeStorage.setItem("LAB_ERP_BASELINE_HIDDEN_COLS", JSON.stringify(hiddenColumns));
+          }
+          if (Array.isArray(db.pinnedColumns)) {
+            pinnedColumns = [...db.pinnedColumns];
+            SafeStorage.setItem("LAB_ERP_PINNED_COLUMNS", JSON.stringify(pinnedColumns));
+          }
+          if (db.customColWidths && typeof db.customColWidths === "object") {
+            CUSTOM_COL_WIDTHS = Object.assign({}, db.customColWidths);
+            SafeStorage.setItem("LAB_ERP_COL_WIDTHS", JSON.stringify(CUSTOM_COL_WIDTHS));
+          }
+
           // 9. Zaman damgası ve revizyon eşitleme
           localDatabaseRevision = remoteRev;
           lastLocalMutationTime = remoteTs;
@@ -5628,6 +5643,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
           if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
           if (typeof renderTableHeaders === "function") renderTableHeaders();
           if (typeof applyColumnVisibility === "function") applyColumnVisibility();
+          if (typeof renderColumnCheckboxes === "function") renderColumnCheckboxes();
           if (typeof applyTableFilters === "function") {
             applyTableFilters();
           } else if (typeof renderTable === "function") {
@@ -17868,8 +17884,15 @@ async function initializeLabErpApp() {
 
       // 3. Gizli sütunları geri yükle
       if (Array.isArray(v.hiddenColumns)) {
-        hiddenColumns = [...v.hiddenColumns];
-        if (typeof saveHiddenColumnsToStorage === "function") saveHiddenColumnsToStorage();
+        // Eğer sayfa ilk açılıyorsa (isSilent = true) ve kullanıcının doğrudan kaydettiği bir gizli sütun listesi varsa onu koru!
+        const hasExplicitStored = SafeStorage.getItem("LAB_ERP_HIDDEN_COLUMNS");
+        if (isSilent && hasExplicitStored) {
+          // Doğrudan hafızadaki güncel gizli sütunları koru
+        } else {
+          hiddenColumns = [...v.hiddenColumns];
+          SafeStorage.setItem("LAB_ERP_HIDDEN_COLUMNS", JSON.stringify(hiddenColumns));
+          SafeStorage.setItem("LAB_ERP_BASELINE_HIDDEN_COLS", JSON.stringify(hiddenColumns));
+        }
       }
 
       // 4. İğneli sütunları geri yükle
@@ -17948,6 +17971,19 @@ async function initializeLabErpApp() {
     function savePinnedColumnsToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_PINNED_COLUMNS", JSON.stringify(pinnedColumns));
+        if (typeof activeSavedViewId !== "undefined" && typeof savedViews !== "undefined" && Array.isArray(savedViews)) {
+          const v = savedViews.find(x => x.id === activeSavedViewId);
+          if (v) {
+            v.pinnedColumns = [...pinnedColumns];
+            try { SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews)); } catch(e){}
+          }
+        }
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified("Sütun Sabitleme Değişikliği");
+          }
+        }
       } catch (e) {
         console.error("savePinnedColumns error:", e);
       }
@@ -18079,23 +18115,42 @@ async function initializeLabErpApp() {
     // ==========================================
     function loadHiddenColumnsFromStorage() {
       try {
-        const stored = SafeStorage.getItem("LAB_ERP_HIDDEN_COLUMNS");
+        const stored = SafeStorage.getItem("LAB_ERP_HIDDEN_COLUMNS") || SafeStorage.getItem("LAB_ERP_BASELINE_HIDDEN_COLS");
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
-            hiddenColumns = parsed.filter(c => !["col-numune-id", "col-personel", "col-numune-sahibi", "col-urun-tipi", "col-firma", "col-aciklama"].includes(c));
+            hiddenColumns = [...parsed];
+            return;
           }
         }
       } catch (e) {
-        console.error("Storage error:", e);
+        console.error("loadHiddenColumnsFromStorage error:", e);
       }
     }
 
     function saveHiddenColumnsToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_HIDDEN_COLUMNS", JSON.stringify(hiddenColumns));
+        SafeStorage.setItem("LAB_ERP_BASELINE_HIDDEN_COLS", JSON.stringify(hiddenColumns));
+
+        // Aktif görünüm varsa onun gizli sütunlarını da anında senkronize et
+        if (typeof activeSavedViewId !== "undefined" && typeof savedViews !== "undefined" && Array.isArray(savedViews)) {
+          const v = savedViews.find(x => x.id === activeSavedViewId);
+          if (v) {
+            v.hiddenColumns = [...hiddenColumns];
+            try { SafeStorage.setItem("LAB_ERP_SAVED_VIEWS", JSON.stringify(savedViews)); } catch(e){}
+          }
+        }
+
+        // Otoriter Master: Kullanıcı sütun göster/gizle yaptığında bunu derhal son işlem olarak kaydet ve buluta ilet
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified("Sütun Görünürlüğü Değişikliği");
+          }
+        }
       } catch (e) {
-        console.error("Storage error:", e);
+        console.error("saveHiddenColumnsToStorage error:", e);
       }
     }
 
