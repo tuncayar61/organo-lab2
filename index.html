@@ -5373,8 +5373,13 @@ const DEFAULT_TEMPLATE_FIELDS = [
           vardiyaList: (typeof VARDIYA_LIST !== "undefined" ? VARDIYA_LIST : []),
           turList: (typeof TUR_LIST !== "undefined" ? TUR_LIST : []),
           surecList: (typeof SUREC_LIST !== "undefined" ? SUREC_LIST : []),
-          uygunlukList: (typeof UYGUNLUK_LIST !== "undefined" ? UYGUNLUK_LIST : [])
+          uygunlukList: (typeof UYGUNLUK_LIST !== "undefined" ? UYGUNLUK_LIST : []),
+          bazList: (typeof BAZ_LIST !== "undefined" ? BAZ_LIST : []),
+          numuneSahibiList: (typeof NUMUNE_SAHIBI_LIST !== "undefined" ? NUMUNE_SAHIBI_LIST : []),
+          urunTipiList: (typeof URUN_TIPI_LIST !== "undefined" ? URUN_TIPI_LIST : []),
+          firmaList: (typeof FIRMA_LIST !== "undefined" ? FIRMA_LIST : [])
         },
+        categoryOptionColors: (typeof window.CATEGORY_CUSTOM_COLORS !== "undefined" ? window.CATEGORY_CUSTOM_COLORS : {}),
         usersList: (typeof usersList !== "undefined" ? usersList : []),
         roleTemplates: (typeof roleTemplates !== "undefined" ? roleTemplates : []),
         hiddenColumns: (typeof hiddenColumns !== "undefined" ? hiddenColumns : []),
@@ -5600,6 +5605,25 @@ const DEFAULT_TEMPLATE_FIELDS = [
             SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
             customFields = templateFields.filter(f => !f.isStandard && f.enabled);
             SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
+
+            // Şablondaki seçeneklerin (options) sıralamasını master listelere de 100% yansıt
+            templateFields.forEach(tf => {
+              if (Array.isArray(tf.options) && tf.options.length > 0) {
+                if (tf.key === "baz") BAZ_LIST = [...tf.options];
+                else if (tf.key === "tur") TUR_LIST = [...tf.options];
+                else if (tf.key === "surec") SUREC_LIST = [...tf.options];
+                else if (tf.key === "uygunluk") UYGUNLUK_LIST = [...tf.options];
+                else if (tf.key === "hat") HAT_LIST = [...tf.options];
+                else if (tf.key === "goz") GOZ_LIST = [...tf.options];
+                else if (tf.key === "vardiya") VARDIYA_LIST = [...tf.options];
+                else if (tf.key === "personel") PERSONEL_LIST = [...tf.options];
+                else if (tf.key === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...tf.options];
+                else if (tf.key === "urunTipi") URUN_TIPI_LIST = [...tf.options];
+                else if (tf.key === "firma") FIRMA_LIST = [...tf.options];
+                else if (tf.key === "urun") URUN_LIST = [...tf.options];
+              }
+            });
+            saveMasterDataToStorage();
           }
 
           // 8. Master listeler
@@ -5610,6 +5634,19 @@ const DEFAULT_TEMPLATE_FIELDS = [
             if (Array.isArray(md.gozList) && md.gozList.length > 0) GOZ_LIST = md.gozList;
             if (Array.isArray(md.personelList) && md.personelList.length > 0) PERSONEL_LIST = md.personelList;
             if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = md.vardiyaList;
+            if (Array.isArray(md.turList) && md.turList.length > 0) TUR_LIST = md.turList;
+            if (Array.isArray(md.surecList) && md.surecList.length > 0) SUREC_LIST = md.surecList;
+            if (Array.isArray(md.uygunlukList) && md.uygunlukList.length > 0) UYGUNLUK_LIST = md.uygunlukList;
+            if (Array.isArray(md.bazList) && md.bazList.length > 0) BAZ_LIST = md.bazList;
+            if (Array.isArray(md.numuneSahibiList) && md.numuneSahibiList.length > 0) NUMUNE_SAHIBI_LIST = md.numuneSahibiList;
+            if (Array.isArray(md.urunTipiList) && md.urunTipiList.length > 0) URUN_TIPI_LIST = md.urunTipiList;
+            if (Array.isArray(md.firmaList) && md.firmaList.length > 0) FIRMA_LIST = md.firmaList;
+            saveMasterDataToStorage();
+          }
+
+          if (db.categoryOptionColors && typeof db.categoryOptionColors === "object") {
+            window.CATEGORY_CUSTOM_COLORS = Object.assign({}, window.CATEGORY_CUSTOM_COLORS || {}, db.categoryOptionColors);
+            SafeStorage.setItem("LAB_ERP_CATEGORY_OPTION_COLORS", JSON.stringify(window.CATEGORY_CUSTOM_COLORS));
           }
 
           // 8.1 Sütun Görünürlüğü (hiddenColumns), Sabitlemeler (pinnedColumns) ve Genişlikler
@@ -5644,6 +5681,17 @@ const DEFAULT_TEMPLATE_FIELDS = [
           if (typeof renderTableHeaders === "function") renderTableHeaders();
           if (typeof applyColumnVisibility === "function") applyColumnVisibility();
           if (typeof renderColumnCheckboxes === "function") renderColumnCheckboxes();
+          if (typeof applyAllFieldColSpans === "function") applyAllFieldColSpans();
+          if (typeof syncAllFormLabelsFromTemplateFields === "function") syncAllFormLabelsFromTemplateFields();
+          if (typeof renderModalBazButtons === "function") renderModalBazButtons();
+          if (typeof refreshAllDropdowns === "function") refreshAllDropdowns();
+          if (typeof updateCustomFieldCategorySelects === "function") updateCustomFieldCategorySelects();
+          if (typeof currentPopoverFieldKey !== "undefined" && currentPopoverFieldKey) {
+            const popoverEl = document.getElementById("fieldConfigPopover");
+            if (popoverEl && !popoverEl.classList.contains("hidden") && typeof openFieldConfigPopover === "function") {
+              openFieldConfigPopover(currentPopoverFieldKey, null, null);
+            }
+          }
           if (typeof applyTableFilters === "function") {
             applyTableFilters();
           } else if (typeof renderTable === "function") {
@@ -19788,9 +19836,14 @@ async function initializeLabErpApp() {
         }
         return `
           <td class="py-1 px-1 border-r border-slate-200 text-center bg-teal-50/40 ${colClass}">
-            <select onchange="onRowBazSelectChanged('${row.id}', this.value, this)" class="p-1 px-1.5 rounded text-[10px] font-black shadow-sm cursor-pointer border border-black/10" style="background-color: ${bazBg}; color: ${bazFg};">
-              <option value="KURU" style="background-color: ${kuruCol}; color: ${kuruFg}; font-weight: bold;" ${isKuru ? "selected" : ""}>KURU</option>
-              <option value="YAŞ" style="background-color: ${yasCol}; color: ${yasFg}; font-weight: bold;" ${!isKuru ? "selected" : ""}>YAŞ</option>
+            <select onchange="onRowBazSelectChanged('${row.id}', this.value, this)" class="p-1 px-1.5 rounded text-[10px] font-black shadow-2xs cursor-pointer border border-black/10" style="background-color: ${bazBg}; color: ${bazFg};">
+              ${(getCategoryFieldOptions("baz") || ["YAŞ", "KURU"]).map(bOpt => {
+                const bVal = (String(bOpt).trim().toUpperCase() === "YAŞ") ? "YAŞ" : "KURU";
+                const bCol = getCategoryOptionColor("baz", bVal) || (bVal === "KURU" ? "#99f6e4" : "#bae6fd");
+                const bFg = getContrastTextColor(bCol);
+                const bSel = (bVal === "KURU" ? isKuru : !isKuru) ? "selected" : "";
+                return `<option value="${bVal}" style="background-color: ${bCol}; color: ${bFg}; font-weight: bold;" ${bSel}>${bVal}</option>`;
+              }).join("")}
             </select>
           </td>
         `;
@@ -25845,16 +25898,14 @@ function closeModal() {
         SafeStorage.setItem("LAB_ERP_PERSONEL_LIST", JSON.stringify(PERSONEL_LIST));
 
         // Numune türü listesini zorunlu güncel tut
-        TUR_LIST = [
-          "ÜRETİM",
-          "SEVKİYAT",
-          "HAMMADDE",
-          "DOĞRULAMA",
-          "AMBAR TARAMASI",
-          "DIŞ ANALİZ",
-          "MÜŞTERİ"
-        ];
-        SafeStorage.setItem("LAB_ERP_TUR_LIST", JSON.stringify(TUR_LIST));
+        const sTur = SafeStorage.getItem("LAB_ERP_TUR_LIST");
+        if (sTur) {
+          const parsed = JSON.parse(sTur);
+          if (Array.isArray(parsed) && parsed.length > 0) TUR_LIST = parsed;
+        } else {
+          TUR_LIST = ["ÜRETİM", "SEVKİYAT", "HAMMADDE", "DOĞRULAMA", "AMBAR TARAMASI", "DIŞ ANALİZ", "MÜŞTERİ"];
+          SafeStorage.setItem("LAB_ERP_TUR_LIST", JSON.stringify(TUR_LIST));
+        }
         const sVardiya = SafeStorage.getItem("LAB_ERP_VARDIYA_LIST");
         if (sVardiya) {
           const parsed = JSON.parse(sVardiya);
@@ -26770,10 +26821,23 @@ function closeModal() {
             baz: (typeof BAZ_LIST !== "undefined" && Array.isArray(BAZ_LIST)) ? BAZ_LIST : ["YAŞ", "KURU"]
           };
           Object.keys(syncMap).forEach(key => {
-            const list = syncMap[key];
             const tf = templateFields.find(f => f.key === key);
-            if (tf && Array.isArray(list)) {
-              tf.options = [...list];
+            if (tf && Array.isArray(tf.options) && tf.options.length > 0) {
+              // tf.options şablondaki güncel sıralamayı tutar; master listeleri de bu sıralamayla güncelle
+              if (key === "baz") BAZ_LIST = [...tf.options];
+              else if (key === "tur") TUR_LIST = [...tf.options];
+              else if (key === "surec") SUREC_LIST = [...tf.options];
+              else if (key === "uygunluk") UYGUNLUK_LIST = [...tf.options];
+              else if (key === "hat") HAT_LIST = [...tf.options];
+              else if (key === "goz") GOZ_LIST = [...tf.options];
+              else if (key === "vardiya") VARDIYA_LIST = [...tf.options];
+              else if (key === "personel") PERSONEL_LIST = [...tf.options];
+              else if (key === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...tf.options];
+              else if (key === "urunTipi") URUN_TIPI_LIST = [...tf.options];
+              else if (key === "firma") FIRMA_LIST = [...tf.options];
+              else if (key === "urun") URUN_LIST = [...tf.options];
+            } else if (tf && Array.isArray(syncMap[key]) && syncMap[key].length > 0) {
+              tf.options = [...syncMap[key]];
             }
           });
         }
@@ -26862,13 +26926,19 @@ function closeModal() {
         SafeStorage.setItem("LAB_ERP_UYGUNLUK_LIST", JSON.stringify(UYGUNLUK_LIST));
         SafeStorage.setItem("LAB_ERP_BAZ_LIST", JSON.stringify(BAZ_LIST));
         SafeStorage.setItem("LAB_ERP_REQUIRED_FIELDS_CONFIG", JSON.stringify(requiredFieldsConfig));
+
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified("Master Veri / Liste Güncellemesi");
+          }
+        }
       } catch (e) {
         console.error("Master data storage save error:", e);
       }
     }
 
-    // Hızlı Modal Açılışı İçin Sadece Modal Dropdownlarını Yenileyen Hafif Fonksiyon
-        function setOpts(id, list) {
+    function setOpts(id, list) {
       const el = document.getElementById(id);
       if (!el || !Array.isArray(list)) return;
       const cur = el.value;
@@ -27738,6 +27808,12 @@ function closeModal() {
     function saveTemplateFieldsToStorage() {
       try {
         SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified("Şablon Alanları Güncellemesi");
+          }
+        }
       } catch (e) {
         console.error("Template fields save error:", e);
       }
