@@ -4703,6 +4703,24 @@ const DEFAULT_TEMPLATE_FIELDS = [
         optionsColors: ["#5bb75b", "#faa732", "#da4f49"]
       },
 
+      // --------------------------------------------------------
+      // 2.1 MİKRO ELEMENTLER & DİĞER ANALİZLER (KATEGORİ: Nihai)
+      // --------------------------------------------------------
+      { id: "fld_cao", key: "cao", label: "Toplam Kalsiyum (CaO %)", headerLabel: "CaO (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-cao", decimals: 2 },
+      { id: "fld_mgo", key: "mgo", label: "Toplam Magnezyum (MgO %)", headerLabel: "MgO (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-mgo", decimals: 2 },
+      { id: "fld_na2o", key: "na2o", label: "Toplam Sodyum (Na2O %)", headerLabel: "Na2O (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-na2o", decimals: 2 },
+      { id: "fld_b", key: "b", label: "Toplam Bor (B %)", headerLabel: "B (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-b", decimals: 3 },
+      { id: "fld_fe", key: "fe", label: "Toplam Demir (Fe %)", headerLabel: "Fe (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-fe", decimals: 3 },
+      { id: "fld_mn", key: "mn", label: "Toplam Mangan (Mn %)", headerLabel: "Mn (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-mn", decimals: 3 },
+      { id: "fld_cu", key: "cu", label: "Toplam Bakır (Cu %)", headerLabel: "Cu (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-cu", decimals: 3 },
+      { id: "fld_klorur", key: "klorur", label: "Klorür (Cl- %)", headerLabel: "Cl- (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-klorur", decimals: 2 },
+      { id: "fld_biure", key: "biure", label: "Biüre (%)", headerLabel: "Biüre (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-biure", decimals: 2 },
+      { id: "fld_okm", key: "okm", label: "Organik Kuru Madde (OKM %)", headerLabel: "OKM (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-okm", decimals: 2 },
+      { id: "fld_grav_p2o5", key: "grav_p2o5", label: "Gravimetrik P2O5 (%)", headerLabel: "Grav. P2O5 (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-grav-p2o5", decimals: 2 },
+      { id: "fld_grav_k2o", key: "grav_k2o", label: "Gravimetrik K2O (%)", headerLabel: "Grav. K2O (%)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-grav-k2o", decimals: 2 },
+      { id: "fld_ec", key: "ec", label: "İletkenlik (EC mS/cm)", headerLabel: "EC (mS/cm)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-ec", decimals: 2 },
+      { id: "fld_yogunluk", key: "yogunluk", label: "Yoğunluk (g/cm³)", headerLabel: "Yoğunluk (g/cm³)", type: "number", category: "Nihai", group: "Mikro Elementler", isStandard: true, enabled: true, required: false, colClass: "col-yogunluk", decimals: 3 },
+
       // ========================================================
       // 3. YAŞ BAZ ANALİZ DEĞERLERİ (KATEGORİ: Yaş)
       // ========================================================
@@ -5338,13 +5356,32 @@ const DEFAULT_TEMPLATE_FIELDS = [
     }
 
     // OTORİTER MASTER PAKETİ FIREBASE'E GÖNDERME
+    let pendingCloudPushAction = null;
+
     function pushAuthoritativeMasterToFirebase(actionDescription = "Güncelleme") {
       if (typeof fetch === "undefined") return;
       if (isAppInitializing) return;
       if (isApplyingRemoteCloudSync) return;
-      if (isCloudSyncInProgress) return;
-      isCloudSyncInProgress = true;
 
+      // Eğer şu an bir gönderme sürüyorsa, son eylemi kuyruğa al ve bitince gönder
+      if (isCloudSyncInProgress) {
+        pendingCloudPushAction = actionDescription;
+        return;
+      }
+
+      // GÜVENLİK KALKANI: Eğer yerel kayıt listesi boşsa ve bu açık bir kullanıcı silme/sıfırlama eylemi değilse,
+      // boş bir cihazın yanlışlıkla buluttaki dolu veritabanını ezmesini KESİNLİKLE ENGELLE!
+      const isExplicitDeleteAction = actionDescription && (
+        actionDescription.includes("Silme") || 
+        actionDescription.includes("Çöp") || 
+        actionDescription.includes("Sıfırlama")
+      );
+      if (Array.isArray(labRecords) && labRecords.length === 0 && !isExplicitDeleteAction) {
+        console.warn("Boş kayıt listesi gönderme engellendi (Silme eylemi değil):", actionDescription);
+        return;
+      }
+
+      isCloudSyncInProgress = true;
       setCloudStatusSyncing();
 
       const authoritativeBundle = {
@@ -5410,10 +5447,17 @@ const DEFAULT_TEMPLATE_FIELDS = [
       })
       .catch(err => {
         handleCloudSyncError(err, false);
+      })
+      .finally(() => {
+        isCloudSyncInProgress = false;
+        if (pendingCloudPushAction) {
+          const act = pendingCloudPushAction;
+          pendingCloudPushAction = null;
+          setTimeout(() => { pushAuthoritativeMasterToFirebase(act); }, 50);
+        }
       });
     }
 
-    // CANLI FIREBASE VE SERVER-SENT EVENTS (SSE) DİNLEYİCİSİ
     function initFirebaseRealtime() {
       // 1. Sayfa açılır açılmaz sunucudaki en güncel kayıtları çek
       setTimeout(() => { triggerFirebasePull(false); }, 100);
@@ -5536,6 +5580,20 @@ const DEFAULT_TEMPLATE_FIELDS = [
         const localCount = Array.isArray(labRecords) ? labRecords.length : 0;
         const remoteCount = Array.isArray(db.records) ? db.records.length : 0;
 
+        // KRİTİK GÜVENLİK KALKANI:
+        // Eğer bu bilgisayarda canlı kayıtlar varsa (localCount > 0) ve uzaktan gelen otomatik sorgu boşsa (remoteCount === 0)
+        // ve bu kullanıcı tarafından açıkça yapılmış bir "Tümünü Sil / Sıfırla" eylemi değilse:
+        // Uzaktan gelen boş verinin yereldeki canlı kayıtları SİLMESİNE ASLA İZİN VERİLEMEZ!
+        if (localCount > 0 && remoteCount === 0 && !isUserInitiated) {
+          const isExplicitRemoteDelete = db.action && (db.action.includes("Silme") || db.action.includes("Çöp") || db.action.includes("Sıfırlama"));
+          if (!isExplicitRemoteDelete) {
+            console.warn("Kritik Güvenlik Kalkanı: Uzak sunucudaki boş veri yereldeki " + localCount + " kaydı silemez! Yerel kayıtlar korunuyor ve buluta otoriter olarak yeniden yükleniyor.");
+            triggerCloudSyncImmediate("Kayıtları Boş Ezilmeden Koruma");
+            setCloudStatusReady(localCount);
+            return;
+          }
+        }
+
         // "EN SON HANGİ CİHAZDA GÜNCELLEME YAPILDIYSA O KALSIN (OTORİTER MASTER MODELİ)"
         // Uzaktaki güncelleme zamanı yerelden yeniyse VEYA revizyon daha büyükse VEYA yerel boşsa VEYA kullanıcı "Eşitle" dediyse:
         const isRemoteAuthoritative = (localCount === 0 && remoteCount > 0) ||
@@ -5552,10 +5610,20 @@ const DEFAULT_TEMPLATE_FIELDS = [
         // Uzak sunucu daha güncel! Doğrudan otoriter olarak kabul et.
         isApplyingRemoteCloudSync = true;
         try {
+          // Uzaktaki otoriter master'ın getirdiği canlı kayıtlar (db.records) esastır!
+          // Canlı gelen hiçbir kayıt yerel cihazın eski kara listesinde kalarak filtrelenemez!
+          const remoteLiveIds = new Set((db.records || []).map(r => r && r.id ? String(r.id) : "").filter(Boolean));
+
           // 1. Silinen kayıt kara listelerini birleştir
           const allDeletedIds = (typeof getAllTombstoneIds === "function") ? getAllTombstoneIds() : new Set();
           (db.deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
           (deletedRecords || []).forEach(d => { if (d && d.id) allDeletedIds.add(String(d.id)); });
+
+          // Canlı gelen kayıtları kara listeden ve çöp kutusundan derhal temizle
+          remoteLiveIds.forEach(id => {
+            allDeletedIds.delete(id);
+            if (typeof removeRecordIdFromTombstones === "function") removeRecordIdFromTombstones(id);
+          });
 
           // 2. Silinen filtre kara listesini birleştir
           let localDelFacets = [];
@@ -5571,10 +5639,9 @@ const DEFAULT_TEMPLATE_FIELDS = [
           (db.deletedViews || []).forEach(vId => allDelViews.add(vId));
           SafeStorage.setItem("LAB_ERP_DELETED_VIEWS", JSON.stringify(Array.from(allDelViews)));
 
-          // 4. Kayıtları arındır ve doğrudan ata (Eski kayıtları asla birleştirip geri basma!)
-          const cleanRemoteRecords = (db.records || []).filter(r => !allDeletedIds.has(String(r.id)));
-          labRecords = cleanRemoteRecords;
-          deletedRecords = Array.isArray(db.deletedRecords) ? db.deletedRecords : (deletedRecords || []);
+          // 4. Kayıtları doğrudan ata (Otoriter master doğrudan geçerlidir)
+          labRecords = Array.isArray(db.records) ? db.records : [];
+          deletedRecords = (Array.isArray(db.deletedRecords) ? db.deletedRecords : []).filter(d => d && !remoteLiveIds.has(String(d.id)));
           saveDeletedRecordsToStorage();
 
           // 5. Filtreleri ve Görünümleri doğrudan ata (Silinmiş olanları filtrele)
@@ -6120,6 +6187,25 @@ const DEFAULT_TEMPLATE_FIELDS = [
     // ========================================================
     // KALICI ANTİ-RESURRECTION (SİLİNEN VERİLERİN ASLA GERİ GELMEMESİ) MOTORU
     // ========================================================
+    function removeRecordIdFromTombstones(id) {
+      if (!id) return;
+      try {
+        let list = [];
+        const s = SafeStorage.getItem("LAB_ERP_TOMBSTONES");
+        if (s) {
+          try { list = JSON.parse(s) || []; } catch(e) {}
+        }
+        const strId = String(id);
+        if (list.includes(strId)) {
+          list = list.filter(x => String(x) !== strId);
+          SafeStorage.setItem("LAB_ERP_TOMBSTONES", JSON.stringify(list));
+          if (typeof saveStateToIndexedDb === "function") {
+            saveStateToIndexedDb("LAB_ERP_TOMBSTONES", list);
+          }
+        }
+      } catch(e) {}
+    }
+
     function addRecordIdToTombstones(id) {
       if (!id) return;
       try {
@@ -6155,21 +6241,21 @@ const DEFAULT_TEMPLATE_FIELDS = [
     }
 
     function applyAntiResurrectionFilter() {
-      if (!Array.isArray(labRecords)) return;
-      const tombstones = getAllTombstoneIds();
-      if (tombstones.size === 0) return;
-
-      const origLen = labRecords.length;
-      labRecords = labRecords.filter(r => !tombstones.has(String(r.id)));
-      if (labRecords.length !== origLen) {
-        console.log(`Anti-Resurrection: Silinmiş ${origLen - labRecords.length} kayıt tablodan arındırıldı.`);
-        if (typeof saveLabRecordsToStorage === "function") {
-          saveLabRecordsToStorage();
+      if (!Array.isArray(labRecords) || labRecords.length === 0) return;
+      // Aktif kayıtlardaki ID'leri kara listeden derhal temizle (Yeniden yüklenen / diriltilen kayıtlar korunur)
+      labRecords.forEach(r => {
+        if (r && r.id) removeRecordIdFromTombstones(r.id);
+      });
+      if (Array.isArray(deletedRecords)) {
+        const liveSet = new Set(labRecords.map(r => r && r.id ? String(r.id) : "").filter(Boolean));
+        const origTrashLen = deletedRecords.length;
+        deletedRecords = deletedRecords.filter(d => !liveSet.has(String(d.id)));
+        if (deletedRecords.length !== origTrashLen) {
+          saveDeletedRecordsToStorage();
         }
       }
     }
 
-    
     function updateTrashBadge() {
       const badgeModal = document.getElementById("badgeTrashCount");
       if (badgeModal) badgeModal.innerText = deletedRecords.length;
@@ -22282,7 +22368,9 @@ function closeModal() {
     }
 
     function saveModalForm() {
-      clearAllValidationErrors();
+      clearAllValidationEr
+      isAppInitializing = false;
+rors();
 
       const selectedPersonel = [];
       document.querySelectorAll(".personel-cb:checked").forEach(cb => {
@@ -25057,6 +25145,7 @@ function closeModal() {
     }
 
     async function executeExcelImport() {
+      isAppInitializing = false;
       if (!pendingImportRows || pendingImportRows.length === 0) return;
 
       const confirmBtn = document.getElementById("btnConfirmExcelImport");
@@ -25431,7 +25520,7 @@ function closeModal() {
               if (!f || !f.key) return;
               if (f.isStandard) {
                 if (!protectedKeys.includes(f.key) && mapped[f.key] !== undefined && mapped[f.key] !== null) {
-                  recordObj[f.key] = mapped[f.key];
+                  recordObj[f.key] = (f.type === "number") ? parseTRNumber(mapped[f.key]) : mapped[f.key];
                 }
               } else {
                 const val = customFieldVals[f.key] !== undefined ? customFieldVals[f.key] : mapped["cf_" + f.key];
@@ -25466,17 +25555,32 @@ function closeModal() {
         return idB - idA;
       });
 
-      // 1. INDEXEDDB'YE HEMEN VE DOĞRUDAN KAYDET (Kalıcı ve Sınırsız Depolama)
+      // 1. Yeni içe aktarılan kayıtların ID'lerini Çöp Kutusu ve Tombstone (kara liste)'den tamamen temizle
+      if (typeof removeRecordIdFromTombstones === "function") {
+        newImportedRecords.forEach(r => {
+          if (r && r.id) removeRecordIdFromTombstones(r.id);
+        });
+      }
+      if (Array.isArray(deletedRecords)) {
+        const importedIdSet = new Set(newImportedRecords.map(r => String(r.id)));
+        deletedRecords = deletedRecords.filter(d => !importedIdSet.has(String(d.id)));
+        saveDeletedRecordsToStorage();
+      }
+
+      // 2. INDEXEDDB'YE HEMEN VE DOĞRUDAN KAYDET (Kalıcı ve Sınırsız Depolama)
       await saveStateToIndexedDb("LAB_ERP_RECORDS", labRecords);
 
-      // 2. Birincil Hafıza ve Master Kayıt
+      // 3. Birincil Hafıza ve Master Kayıt
       saveLabRecordsToStorage();
       syncMasterListsAndStorage();
 
-      // 3. Değişikliği Otoriter Olarak İşaretle (Bulutun bu veriyi ezmesini kesinlikle engeller!)
+      // 4. Değişikliği Otoriter Olarak İşaretle ve BULUTA DERHAL ZORUNLU GÖNDER
       markLocalDatabaseModified(`Excel İçe Aktarma: ${successCount} kayıt`);
+      if (typeof pushAuthoritativeMasterToFirebase === "function") {
+        pushAuthoritativeMasterToFirebase(`Excel İçe Aktarma: ${successCount} kayıt`);
+      }
 
-      // 4. Filtreleri Sıfırla ve Tabloyu Yenile (Kayıtlar hemen ekranda görünsün)
+      // 5. Filtreleri Sıfırla ve Tabloyu Yenile (Kayıtlar hemen ekranda görünsün)
       // Şablondaki ve Excel'deki tüm sütunların tabloda görünür olmasını garanti et (birebir yansıma)
       hiddenColumns = hiddenColumns.filter(c => c !== "col-personel");
       if (typeof saveHiddenColumnsToStorage === "function") saveHiddenColumnsToStorage();
