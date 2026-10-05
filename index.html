@@ -12970,6 +12970,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     let cloudSyncDebounceTimer = null;
     let isCloudSyncInProgress = false;
     let isApplyingRemoteCloudSync = false;
+    let hasUnsavedLocalUserEdits = false;
+    let lastLocalUserEditTime = 0;
     let isAppInitializing = true; // Sayfa ilk açılırken erken/boş push yapılmasını önler!
     let firebaseSseSource = null;
     let lastCloudSyncSuccessTime = null;
@@ -13000,6 +13002,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     // HERHANGİ BİR BİLGİSAYARDA SİLME / EKLEME / DÜZENLEME YAPILDIĞINDA ÇAĞRILIR
     function markLocalDatabaseModified(actionDescription = "Güncelleme") {
       if (isAppInitializing) return;
+      hasUnsavedLocalUserEdits = true;
+      lastLocalUserEditTime = Date.now();
       lastLocalMutationTime = Date.now();
       localDatabaseRevision++;
       SafeStorage.setItem("LAB_ERP_DB_REVISION", String(localDatabaseRevision));
@@ -13123,8 +13127,13 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         if (!res.ok) {
           return res.text().then(t => { throw new Error("HTTP PUT " + res.status + " " + t); });
         }
+        hasUnsavedLocalUserEdits = false;
         lastCloudSyncSuccessTime = new Date();
         lastCloudAction = actionDescription;
+        lastAppliedRemoteTimestamp = authoritativeBundle.timestamp;
+        lastAppliedRemoteRevision = authoritativeBundle.revision;
+        SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_TS", String(lastAppliedRemoteTimestamp));
+        SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_REV", String(lastAppliedRemoteRevision));
         setCloudStatusReady(labRecords.length);
       })
       .catch(err => {
@@ -13218,7 +13227,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     // SUNUCUDAN GÜNCEL MASTER VERİYİ ÇEKER
     function triggerFirebasePull(isUserInitiated = false) {
       if (typeof fetch === "undefined") return;
-      if (isCloudSyncInProgress && !isUserInitiated) return;
+      if (!isUserInitiated) {
+        if (hasUnsavedLocalUserEdits || isCloudSyncInProgress || isApplyingRemoteCloudSync || cloudSyncDebounceTimer || pendingCloudPushAction) return;
+        if (lastLocalUserEditTime && (Date.now() - lastLocalUserEditTime < 10000)) return;
+      }
       const endpoint = getFirebaseEndpoint();
       if (isUserInitiated) setCloudStatusSyncing();
 
@@ -13292,7 +13304,22 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           return;
         }
 
-        // Uzak sunucu daha güncel! Doğrudan otoriter olarak kabul et.
+        // KRİTİK GÜVENLİK KALKANI: YEREL DEĞİŞİKLİKLERİ KORUMA MOTORU (Revert Engelleme)
+        // Eğer kullanıcı tarafından açıkça "Buluttan Çek" istenmediyse:
+        // A) Kullanıcının bu bilgisayarda yaptığı henüz onaylanmamış bir yerel değişiklik varsa (hasUnsavedLocalUserEdits)
+        // B) Kullanıcı son 10 saniyede bir değişiklik yaptıysa (lastLocalUserEditTime)
+        // C) Gelen paket bu bilgisayarın gönderdiğinden daha eskiyse
+        // Eski uzak paketin yereldeki değişiklikleri geri döndürmesine (revert) KESİNLİKLE İZİN VERİLMEZ!
+        if (!isUserInitiated) {
+          const isRecentLocalEdit = lastLocalUserEditTime && (Date.now() - lastLocalUserEditTime < 10000);
+          if (hasUnsavedLocalUserEdits || isRecentLocalEdit) {
+            console.warn(`[Bulut Kalkanı Engellemesi] Kullanıcı tarafından yapılan taze yerel değişiklikler korunuyor. Uzak paket reddedildi.`);
+            setCloudStatusReady(localCount);
+            return;
+          }
+        }
+
+        // Uzak sunucu yerelden gerçekten daha güncel! Doğrudan otoriter olarak kabul et.
         isApplyingRemoteCloudSync = true;
         try {
           // Uzaktaki otoriter master'ın getirdiği canlı kayıtlar (db.records) esastır!
@@ -13393,10 +13420,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 templateChanged = true;
               } else {
                 // İki bilgisayarda da var -> Hangi alanda en son değişiklik yapıldıysa o alanın güncellemesini kabul et
-                const rTs = remoteField.updatedAt || remoteTs || 0;
+                const rTs = remoteField.updatedAt || 0;
                 const lTs = localField.updatedAt || 0;
 
-                // Seçenekleri birleştir: iki taraftaki seçenekleri de koru (silinmeyi önle)
+                // Seçenekleri birleştir: yerel ve uzak seçenekleri koru
                 let mergedOptions = undefined;
                 let mergedColors = undefined;
                 let mergedColorMap = Object.assign({}, localField.optionColorsMap || {}, remoteField.optionColorsMap || {});
@@ -13404,17 +13431,18 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 if (Array.isArray(remoteField.options) || Array.isArray(localField.options)) {
                   const rOpts = Array.isArray(remoteField.options) ? remoteField.options : [];
                   const lOpts = Array.isArray(localField.options) ? localField.options : [];
-                  if (rTs >= lTs || isUserInitiated) {
+                  // Uzaktan gelen paket kabul edildiyse, uzaktaki sıralama (rOpts) önceliklidir
+                  if (rOpts.length > 0) {
                     mergedOptions = Array.from(new Set([...rOpts, ...lOpts])).filter(Boolean);
                   } else {
-                    mergedOptions = Array.from(new Set([...lOpts, ...rOpts])).filter(Boolean);
+                    mergedOptions = [...lOpts];
                   }
                   mergedColors = mergedOptions.map(opt => {
                     return mergedColorMap[opt] || getCategoryOptionColor(remoteField.key, opt) || "#e0e7ff";
                   });
                 }
 
-                if (rTs >= lTs || isUserInitiated) {
+                if (rTs > lTs || (isUserInitiated && rTs >= lTs)) {
                   // Uzaktaki bu alan daha güncel veya eşit -> uzaktaki alanı kullan
                   const mergedFieldObj = Object.assign({}, localField, remoteField);
                   if (mergedOptions) {
@@ -13546,7 +13574,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             console.warn("Category sync UI refresh error:", catErr);
           }
 
-          // 8. Master listeler (İki bilgisayardaki listeleri birleştirerek koru)
+          // 8. Master listeler (Uzaktan kabul edilen otoriter sıralamayı benimse)
           if (db.masterData && typeof db.masterData === "object") {
             const md = db.masterData;
             if (Array.isArray(md.urunList) && md.urunList.length > 0) URUN_LIST = Array.from(new Set([...md.urunList, ...(URUN_LIST || [])])).filter(Boolean);
@@ -13939,7 +13967,14 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             hatList: HAT_LIST,
             gozList: GOZ_LIST,
             personelList: PERSONEL_LIST,
-            vardiyaList: VARDIYA_LIST
+            vardiyaList: VARDIYA_LIST,
+            turList: TUR_LIST,
+            surecList: SUREC_LIST,
+            uygunlukList: UYGUNLUK_LIST,
+            bazList: BAZ_LIST,
+            numuneSahibiList: NUMUNE_SAHIBI_LIST,
+            urunTipiList: URUN_TIPI_LIST,
+            firmaList: FIRMA_LIST
           },
           pinnedColumns: pinnedColumns,
           hiddenColumns: hiddenColumns
@@ -20947,9 +20982,9 @@ function openTableModifierModal(e) {
       }
     }
 
-    function closeTableModifierModal() {
-      // EĞER KAYDEDİLMEDEN VAZGEÇİLDİYSE TÜM DEĞİŞİKLİKLERİ İPTAL ET VE ESKİ HALİNE GERİ DÖN!
-      if (window.templateModifierSnapshot) {
+    function closeTableModifierModal(forceCancel = false) {
+      // SADECE VE SADECE KULLANICI AÇIKÇA VAZGEÇ E TIKLADIYSA ESKİ HALİNE DÖN
+      if (forceCancel && window.templateModifierSnapshot) {
         const snap = window.templateModifierSnapshot;
         if (Array.isArray(snap.templateFields)) {
           templateFields = JSON.parse(JSON.stringify(snap.templateFields));
@@ -22391,18 +22426,19 @@ function openTableModifierModal(e) {
     function updateCategoryOptionOrder(fieldKey, newOrder) {
       if (!Array.isArray(newOrder) || newOrder.length === 0) return;
 
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
+      const now = Date.now();
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       const currentOpts = getCategoryFieldOptions(fieldKey);
       const colorMap = {};
 
-      // 1. Sürükleme anında DOM'dan veya önbellekten alınan canlı renkler
+      // 1. Sürükleme anında DOM dan veya önbellekten alınan canlı renkler
       if (window._cachedOptionColors && typeof window._cachedOptionColors === "object") {
         Object.entries(window._cachedOptionColors).forEach(([k, c]) => {
           if (c) colorMap[k] = rgbToHex(c);
         });
       }
 
-      // 2. DOM'daki mevcut çip renklerini tara
+      // 2. DOM daki mevcut çip renklerini tara
       const container = document.querySelector(`.category-options-drag-container[data-field-key="${fieldKey}"]`);
       if (container) {
         container.querySelectorAll(".cat-option-chip").forEach(chip => {
@@ -22471,6 +22507,7 @@ function openTableModifierModal(e) {
 
         f.options = [...newOrder];
         f.optionsColors = newOrder.map(opt => colorMap[opt] || getCategoryOptionColor(fieldKey, opt));
+        f.updatedAt = now;
       }
 
       // 8. Global CATEGORY_CUSTOM_COLORS haritasını güncelle ve depola
@@ -22489,7 +22526,19 @@ function openTableModifierModal(e) {
         SafeStorage.setItem("LAB_ERP_CATEGORY_OPTION_COLORS", JSON.stringify(window.CATEGORY_CUSTOM_COLORS));
       } catch(e) {}
 
-      // 9. Standart listeleri güncelle
+      // Şablon açıkken snapshot alınmışsa o snapshot ı da güncelle (asla eski listeye revert etmesin)
+      if (window.templateModifierSnapshot) {
+        if (window.templateModifierSnapshot.masterData) {
+          const keyUpper = (fieldKey === "tur" ? "TUR_LIST" : (fieldKey === "vardiya" ? "VARDIYA_LIST" : (fieldKey === "hat" ? "HAT_LIST" : (fieldKey === "goz" ? "GOZ_LIST" : (fieldKey === "personel" ? "PERSONEL_LIST" : (fieldKey === "urun" ? "URUN_LIST" : null))))));
+          if (keyUpper) window.templateModifierSnapshot.masterData[keyUpper] = [...newOrder];
+        }
+        if (Array.isArray(window.templateModifierSnapshot.templateFields)) {
+          const snapF = window.templateModifierSnapshot.templateFields.find(t => t.key === fieldKey || t.id === fieldKey);
+          if (snapF) snapF.options = [...newOrder];
+        }
+      }
+
+      // 9. Standart ve özel tüm listeleri güncelle
       if (fieldKey === "tur") TUR_LIST = [...newOrder];
       else if (fieldKey === "surec") SUREC_LIST = [...newOrder];
       else if (fieldKey === "uygunluk") UYGUNLUK_LIST = [...newOrder];
@@ -22498,32 +22547,58 @@ function openTableModifierModal(e) {
       else if (fieldKey === "vardiya") VARDIYA_LIST = [...newOrder];
       else if (fieldKey === "personel") PERSONEL_LIST = [...newOrder];
       else if (fieldKey === "urun") URUN_LIST = [...newOrder];
+      else if (fieldKey === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...newOrder];
+      else if (fieldKey === "urunTipi") URUN_TIPI_LIST = [...newOrder];
+      else if (fieldKey === "firma") FIRMA_LIST = [...newOrder];
       else if (fieldKey === "baz") {
         BAZ_LIST = [...newOrder];
-        renderModalBazButtons();
+        if (typeof renderModalBazButtons === "function") renderModalBazButtons();
       }
 
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(fieldKey);
+      if (typeof saveStateToIndexedDb === "function") saveStateToIndexedDb();
+
       refreshAllDropdowns();
       updateCustomFieldCategorySelects();
+
+      if (typeof setOpts === "function") {
+        setOpts("modalNumuneSahibi", NUMUNE_SAHIBI_LIST);
+        setOpts("modalUrunTipi", URUN_TIPI_LIST);
+      }
+      const firmaDl = document.getElementById("firmaDatalist");
+      if (firmaDl && Array.isArray(FIRMA_LIST)) {
+        firmaDl.innerHTML = FIRMA_LIST.map(item => `<option value="${escapeHtml(item)}">`).join("");
+      }
+      if (fieldKey === "personel" && typeof buildPersonelCheckboxes === "function") {
+        buildPersonelCheckboxes();
+      }
 
       if (typeof attachLiveModifierBarsToFields === "function" && typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         attachLiveModifierBarsToFields();
       }
-      if (fieldKey === "personel" && typeof buildPersonelCheckboxes === "function") {
-        buildPersonelCheckboxes();
-      setOpts("modalNumuneSahibi", NUMUNE_SAHIBI_LIST);
-      setOpts("modalUrunTipi", URUN_TIPI_LIST);
-      const firmaDl = document.getElementById("firmaDatalist");
-      if (firmaDl && Array.isArray(FIRMA_LIST)) {
-        firmaDl.innerHTML = FIRMA_LIST.map(f => `<option value="${escapeHtml(f)}">`).join("");
+
+      if (typeof renderPopoverCategoryOptions === "function") {
+        renderPopoverCategoryOptions(fieldKey);
       }
+
+      if (typeof renderMasterItemList === "function" && typeof activeMasterTab !== "undefined" && activeMasterTab === fieldKey) {
+        renderMasterItemList(fieldKey);
+      }
+
+      // 10. Bulut Senkronizasyonunu ve Değişikliği Derhal Bildir
+      const fieldTitle = f ? (f.label || f.headerLabel) : fieldKey;
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Açılır Liste Sıralaması: ${fieldTitle}`);
+      }
+      if (typeof triggerCloudSyncImmediate === "function") {
+        triggerCloudSyncImmediate(`Açılır Liste Sıralaması: ${fieldTitle}`);
+      } else if (typeof triggerCloudSyncDebounced === "function") {
+        triggerCloudSyncDebounced();
       }
 
       if (typeof showToastNotification === "function") {
-        const fieldName = f ? f.label : fieldKey;
-        showToastNotification(`"${fieldName}" seçenek sıralaması güncellendi.`);
+        showToastNotification(`"${fieldTitle}" seçenek sıralaması güncellendi.`);
       }
     }
 
@@ -35082,8 +35157,10 @@ function closeModal() {
           "12.15.5+(10SO3)",
           "12.12.0+(30SO3)"
         ];
-        const nonOfficialExisting = URUN_LIST.filter(p => !official16Keys.includes(p));
-        URUN_LIST = [...official16Keys, ...nonOfficialExisting];
+        // Eksik resmi ürünler varsa listenin sonuna ekle, kullanıcının sıralamasını ASLA ezme
+        official16Keys.forEach(p => {
+          if (!URUN_LIST.includes(p)) URUN_LIST.push(p);
+        });
         SafeStorage.setItem("LAB_ERP_URUN_LIST", JSON.stringify(URUN_LIST));
 
         if (typeof ALL_MASTER_PRODUCTS !== "undefined" && Array.isArray(ALL_MASTER_PRODUCTS)) {
@@ -36153,7 +36230,7 @@ function closeModal() {
       }
     }
 
-    function saveProductCardFromModal() {
+    function saveProductCardFromModal(closeModal = true) {
       const nameInput = document.getElementById("pc_name");
       const name = nameInput ? nameInput.value.trim() : "";
       if (!name) {
@@ -36292,9 +36369,27 @@ function closeModal() {
         renderMasterItemList("urun");
       }
 
-      closeProductCardModal();
-      if (typeof showToastNotification === "function") {
-        showToastNotification(`"${name}" ürün kartı ve spesifikasyonları başarıyla kaydedildi.`);
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Ürün Kartı Kaydedildi: ${name}`);
+      }
+      if (typeof triggerCloudSyncImmediate === "function") {
+        triggerCloudSyncImmediate(`Ürün Kartı: ${name}`);
+      } else if (typeof triggerCloudSyncDebounced === "function") {
+        triggerCloudSyncDebounced();
+      }
+
+      if (closeModal) {
+        closeProductCardModal();
+        if (typeof showToastNotification === "function") {
+          showToastNotification(`"${name}" ürün kartı ve spesifikasyonları başarıyla kaydedildi.`);
+        }
+      } else {
+        editingProductOriginalName = name;
+        const titleEl = document.getElementById("productCardModalTitle");
+        if (titleEl) titleEl.innerText = `Ürün Kartını Düzenle: ${name}`;
+        if (typeof showToastNotification === "function") {
+          showToastNotification(`"${name}" ürün kartı kaydedildi (Düzenlemeye devam edebilirsiniz).`);
+        }
       }
     }
 
@@ -36613,12 +36708,7 @@ function closeModal() {
         SafeStorage.setItem("LAB_ERP_BAZ_LIST", JSON.stringify(BAZ_LIST));
         SafeStorage.setItem("LAB_ERP_REQUIRED_FIELDS_CONFIG", JSON.stringify(requiredFieldsConfig));
 
-        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
-            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
-          if (typeof markLocalDatabaseModified === "function") {
-            markLocalDatabaseModified("Master Veri / Liste Güncellemesi");
-          }
-        }
+        // saveMasterDataToStorage dahili bir depolama yazıcıdır, kendi başına hayalet bulut mutasyonu tetiklemez
       } catch (e) {
         console.error("Master data storage save error:", e);
       }
@@ -36995,6 +37085,10 @@ function closeModal() {
       else if (type === "vardiya") list = VARDIYA_LIST;
       else if (type === "surec") list = SUREC_LIST;
       else if (type === "uygunluk") list = UYGUNLUK_LIST;
+      else if (type === "numuneSahibi") list = NUMUNE_SAHIBI_LIST;
+      else if (type === "urunTipi") list = URUN_TIPI_LIST;
+      else if (type === "firma") list = FIRMA_LIST;
+      else if (type === "baz") list = BAZ_LIST;
 
       if (!list || fromIndex < 0 || fromIndex >= list.length) return;
       const toIndex = fromIndex + direction;
@@ -37003,8 +37097,12 @@ function closeModal() {
       const item = list.splice(fromIndex, 1)[0];
       list.splice(toIndex, 0, item);
 
-      syncMasterListsAndStorage();
-      refreshAllDropdowns();
+      if (typeof updateCategoryOptionOrder === "function") {
+        updateCategoryOptionOrder(type, list);
+      } else {
+        syncMasterListsAndStorage();
+        refreshAllDropdowns();
+      }
       renderMasterItemList(type);
       if (typeof showToastNotification === "function") {
         showToastNotification(`"${item}" sırası güncellendi.`);
@@ -37030,6 +37128,10 @@ function closeModal() {
       else if (tabName === "vardiya") items = VARDIYA_LIST;
       else if (tabName === "surec") items = SUREC_LIST;
       else if (tabName === "uygunluk") items = UYGUNLUK_LIST;
+      else if (tabName === "numuneSahibi") items = NUMUNE_SAHIBI_LIST;
+      else if (tabName === "urunTipi") items = URUN_TIPI_LIST;
+      else if (tabName === "firma") items = FIRMA_LIST;
+      else if (tabName === "baz") items = BAZ_LIST;
 
       if (items.length === 0) {
         container.innerHTML = `<div class="p-3 text-slate-400 italic text-center">Bu listede henüz kayıtlı öğe bulunmuyor.</div>`;
@@ -37699,9 +37801,9 @@ function closeModal() {
         }
         SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
         if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
-            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync && modifiedKey) {
           if (typeof markLocalDatabaseModified === "function") {
-            markLocalDatabaseModified(modifiedKey && typeof modifiedKey === "string" ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
+            markLocalDatabaseModified(typeof modifiedKey === "string" ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
           }
         }
       } catch (e) {
@@ -38976,23 +39078,46 @@ function closeModal() {
 
 function saveMasterTemplate() {
       try {
-        // Kategori seçeneklerini birleştirerek senkronize et (yeni eklenenler asla silinmez)
+        // Kategori seçeneklerini birleştirerek senkronize et (şablondaki sıralama ve yeni eklenenler korunur)
         templateFields.forEach(tf => {
-          if (tf.key === "urun") {
-            URUN_LIST = Array.from(new Set([...URUN_LIST, ...(tf.options || [])]));
-            tf.options = [...URUN_LIST];
-          } else if (tf.key === "vardiya") {
-            VARDIYA_LIST = Array.from(new Set([...VARDIYA_LIST, ...(tf.options || [])]));
-            tf.options = [...VARDIYA_LIST];
-          } else if (tf.key === "hat") {
-            HAT_LIST = Array.from(new Set([...HAT_LIST, ...(tf.options || [])]));
-            tf.options = [...HAT_LIST];
-          } else if (tf.key === "goz") {
-            GOZ_LIST = Array.from(new Set([...GOZ_LIST, ...(tf.options || [])]));
-            tf.options = [...GOZ_LIST];
-          } else if (tf.key === "personel") {
-            PERSONEL_LIST = Array.from(new Set([...PERSONEL_LIST, ...(tf.options || [])]));
-            tf.options = [...PERSONEL_LIST];
+          if (Array.isArray(tf.options) && tf.options.length > 0) {
+            if (tf.key === "urun") {
+              URUN_LIST = Array.from(new Set([...tf.options, ...(URUN_LIST || [])])).filter(Boolean);
+              tf.options = [...URUN_LIST];
+            } else if (tf.key === "vardiya") {
+              VARDIYA_LIST = Array.from(new Set([...tf.options, ...(VARDIYA_LIST || [])])).filter(Boolean);
+              tf.options = [...VARDIYA_LIST];
+            } else if (tf.key === "hat") {
+              HAT_LIST = Array.from(new Set([...tf.options, ...(HAT_LIST || [])])).filter(Boolean);
+              tf.options = [...HAT_LIST];
+            } else if (tf.key === "goz") {
+              GOZ_LIST = Array.from(new Set([...tf.options, ...(GOZ_LIST || [])])).filter(Boolean);
+              tf.options = [...GOZ_LIST];
+            } else if (tf.key === "personel") {
+              PERSONEL_LIST = Array.from(new Set([...tf.options, ...(PERSONEL_LIST || [])])).filter(Boolean);
+              tf.options = [...PERSONEL_LIST];
+            } else if (tf.key === "tur") {
+              TUR_LIST = Array.from(new Set([...tf.options, ...(TUR_LIST || [])])).filter(Boolean);
+              tf.options = [...TUR_LIST];
+            } else if (tf.key === "surec") {
+              SUREC_LIST = Array.from(new Set([...tf.options, ...(SUREC_LIST || [])])).filter(Boolean);
+              tf.options = [...SUREC_LIST];
+            } else if (tf.key === "uygunluk") {
+              UYGUNLUK_LIST = Array.from(new Set([...tf.options, ...(UYGUNLUK_LIST || [])])).filter(Boolean);
+              tf.options = [...UYGUNLUK_LIST];
+            } else if (tf.key === "numuneSahibi") {
+              NUMUNE_SAHIBI_LIST = Array.from(new Set([...tf.options, ...(NUMUNE_SAHIBI_LIST || [])])).filter(Boolean);
+              tf.options = [...NUMUNE_SAHIBI_LIST];
+            } else if (tf.key === "urunTipi") {
+              URUN_TIPI_LIST = Array.from(new Set([...tf.options, ...(URUN_TIPI_LIST || [])])).filter(Boolean);
+              tf.options = [...URUN_TIPI_LIST];
+            } else if (tf.key === "firma") {
+              FIRMA_LIST = Array.from(new Set([...tf.options, ...(FIRMA_LIST || [])])).filter(Boolean);
+              tf.options = [...FIRMA_LIST];
+            } else if (tf.key === "baz") {
+              BAZ_LIST = Array.from(new Set([...tf.options, ...(BAZ_LIST || [])])).filter(Boolean);
+              tf.options = [...BAZ_LIST];
+            }
           }
         });
 
@@ -39013,9 +39138,11 @@ function saveMasterTemplate() {
         refreshAllDropdowns();
         saveTemplateFieldsToStorage();
         applyMasterTemplate();
+        window.templateModifierSnapshot = null;
       } catch (err) {
         console.error("saveMasterTemplate hatası:", err);
       } finally {
+        window.templateModifierSnapshot = null;
         closeTableModifierModal();
         if (typeof showToastNotification === "function") {
           showToastNotification("Podio Şablonu kaydedildi ve değişiklikler uygulandı.");
@@ -39590,6 +39717,10 @@ function renderCustomFieldsInEntryModal() {
                 <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(opt)}</span>
               </div>
               <div class="flex items-center space-x-1 shrink-0">
+                <div class="flex flex-col space-y-0.5 shrink-0 mr-1">
+                  <button type="button" onclick="shiftCategoryOption('${fieldKey}', '${safeOpt}', -1)" class="w-4 h-3.5 bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 rounded flex items-center justify-center text-[8px] font-bold transition cursor-pointer" title="Bir Üste Taşı (▲)">▲</button>
+                  <button type="button" onclick="shiftCategoryOption('${fieldKey}', '${safeOpt}', 1)" class="w-4 h-3.5 bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 rounded flex items-center justify-center text-[8px] font-bold transition cursor-pointer" title="Bir Alta Taşı (▼)">▼</button>
+                </div>
                 <button type="button" onclick="promptEditCategoryOption('${fieldKey}', '${safeOpt}')" class="p-1 text-slate-500 hover:text-indigo-600 rounded hover:bg-slate-100 transition" title="İsmi Değiştir">
                   <i class="fa-solid fa-pen text-[9.5px]"></i>
                 </button>
@@ -41462,11 +41593,14 @@ function renderCustomFieldsInEntryModal() {
           <i class="fa-solid fa-rotate-left text-[11px]"></i> <span>Ada Göre Yeniden Ayrıştır</span>
         </button>
         <div class="flex items-center space-x-2">
-          <button type="button" onclick="closeProductCardModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition">
-            İptal
+          <button type="button" onclick="closeProductCardModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1.5" title="Değişiklikleri iptal et ve pencereyi kapat">
+            <i class="fa-solid fa-xmark text-xs text-slate-500"></i> <span>Vazgeç</span>
           </button>
-          <button type="button" onclick="saveProductCardFromModal()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
-            <i class="fa-solid fa-floppy-disk text-xs"></i> <span>Ürün Kartını Kaydet</span>
+          <button type="button" onclick="saveProductCardFromModal(false)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5" title="Kaydet ve bu ekranda kal">
+            <i class="fa-solid fa-floppy-disk text-xs"></i> <span>Kaydet</span>
+          </button>
+          <button type="button" onclick="saveProductCardFromModal(true)" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5" title="Kaydet ve pencereyi kapat">
+            <i class="fa-solid fa-check text-xs"></i> <span>Kaydet ve Çık</span>
           </button>
         </div>
       </div>
