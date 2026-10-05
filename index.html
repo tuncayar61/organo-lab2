@@ -13125,6 +13125,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         }
         lastCloudSyncSuccessTime = new Date();
         lastCloudAction = actionDescription;
+        lastAppliedRemoteTimestamp = authoritativeBundle.timestamp;
+        lastAppliedRemoteRevision = authoritativeBundle.revision;
+        SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_TS", String(lastAppliedRemoteTimestamp));
+        SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_REV", String(lastAppliedRemoteRevision));
         setCloudStatusReady(labRecords.length);
       })
       .catch(err => {
@@ -13218,7 +13222,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     // SUNUCUDAN GÜNCEL MASTER VERİYİ ÇEKER
     function triggerFirebasePull(isUserInitiated = false) {
       if (typeof fetch === "undefined") return;
-      if (isCloudSyncInProgress && !isUserInitiated) return;
+      if (!isUserInitiated) {
+        if (isCloudSyncInProgress || isApplyingRemoteCloudSync || cloudSyncDebounceTimer || pendingCloudPushAction) return;
+        if (lastLocalMutationTime && (Date.now() - lastLocalMutationTime < 7000)) return;
+      }
       const endpoint = getFirebaseEndpoint();
       if (isUserInitiated) setCloudStatusSyncing();
 
@@ -13292,7 +13299,29 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           return;
         }
 
-        // Uzak sunucu daha güncel! Doğrudan otoriter olarak kabul et.
+        // KRİTİK GÜVENLİK KALKANI: YEREL DEĞİŞİKLİKLERİ KORUMA MOTORU (Revert Engelleme)
+        // Eğer kullanıcı tarafından açıkça "Buluttan Çek" istenmediyse:
+        // A) Kullanıcı son 7 saniyede yerel bir değişiklik yaptıysa (senkronizasyon henüz tamamlanmamış olabilir)
+        // B) Yerel revizyon uzak revizyondan büyük veya eşitse (yerel durum sunucudan daha güncel veya eşit)
+        // C) Yerel son değişiklik zamanı uzak paketin zaman damgasından daha yeniyse
+        // Eski uzak paketin yereldeki değişiklikleri geri döndürmesine (revert) KESİNLİKLE İZİN VERİLMEZ!
+        if (!isUserInitiated) {
+          const isRecentLocalMutation = lastLocalMutationTime && (Date.now() - lastLocalMutationTime < 7000);
+          const isLocalNewerRevision = localDatabaseRevision && remoteRev && (localDatabaseRevision >= remoteRev);
+          const isLocalNewerTimestamp = lastLocalMutationTime && remoteTs && (lastLocalMutationTime > remoteTs);
+
+          if (isRecentLocalMutation || isLocalNewerRevision || isLocalNewerTimestamp) {
+            console.warn(`[Bulut Kalkanı Engellemesi] Uzak sunucudan gelen eski paket (Rev: ${remoteRev}, Ts: ${new Date(remoteTs).toLocaleTimeString()}) yerel değişiklikleri ezemez! Yerel güncel durum (Rev: ${localDatabaseRevision}, Ts: ${new Date(lastLocalMutationTime).toLocaleTimeString()}) korunuyor.`);
+            setCloudStatusReady(localCount);
+            // Eğer yerel durum sunucudan daha yeniyse, sunucuyu da güncellemek için derhal gönder
+            if ((isLocalNewerRevision || isLocalNewerTimestamp) && !isCloudSyncInProgress && !cloudSyncDebounceTimer) {
+              triggerCloudSyncImmediate("Yerel Güncel Durumu Buluta Aktarma");
+            }
+            return;
+          }
+        }
+
+        // Uzak sunucu yerelden gerçekten daha güncel! Doğrudan otoriter olarak kabul et.
         isApplyingRemoteCloudSync = true;
         try {
           // Uzaktaki otoriter master'ın getirdiği canlı kayıtlar (db.records) esastır!
@@ -13393,10 +13422,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 templateChanged = true;
               } else {
                 // İki bilgisayarda da var -> Hangi alanda en son değişiklik yapıldıysa o alanın güncellemesini kabul et
-                const rTs = remoteField.updatedAt || remoteTs || 0;
+                const rTs = remoteField.updatedAt || 0;
                 const lTs = localField.updatedAt || 0;
 
-                // Seçenekleri birleştir: iki taraftaki seçenekleri de koru (silinmeyi önle)
+                // Seçenekleri birleştir: yerel ve uzak seçenekleri koru
                 let mergedOptions = undefined;
                 let mergedColors = undefined;
                 let mergedColorMap = Object.assign({}, localField.optionColorsMap || {}, remoteField.optionColorsMap || {});
@@ -13404,7 +13433,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 if (Array.isArray(remoteField.options) || Array.isArray(localField.options)) {
                   const rOpts = Array.isArray(remoteField.options) ? remoteField.options : [];
                   const lOpts = Array.isArray(localField.options) ? localField.options : [];
-                  if (rTs >= lTs || isUserInitiated) {
+                  if (rTs > lTs || (isUserInitiated && rTs >= lTs)) {
                     mergedOptions = Array.from(new Set([...rOpts, ...lOpts])).filter(Boolean);
                   } else {
                     mergedOptions = Array.from(new Set([...lOpts, ...rOpts])).filter(Boolean);
@@ -13414,7 +13443,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                   });
                 }
 
-                if (rTs >= lTs || isUserInitiated) {
+                if (rTs > lTs || (isUserInitiated && rTs >= lTs)) {
                   // Uzaktaki bu alan daha güncel veya eşit -> uzaktaki alanı kullan
                   const mergedFieldObj = Object.assign({}, localField, remoteField);
                   if (mergedOptions) {
