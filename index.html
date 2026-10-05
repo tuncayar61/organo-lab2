@@ -13082,6 +13082,25 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         customCategoriesTs: parseInt(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES_TS") || "0", 10),
         removedCategories: (typeof getSavedRemovedCategories === "function" ? getSavedRemovedCategories() : JSON.parse(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES") || "[]")),
         removedCategoriesTs: parseInt(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES_TS") || "0", 10),
+        categoryOptionOrders: (() => {
+          const map = {};
+          const keys = ["tur", "surec", "uygunluk", "hat", "goz", "vardiya", "personel", "numuneSahibi", "urunTipi", "firma", "urun", "baz"];
+          (templateFields || []).forEach(tf => { if (tf && tf.key && !keys.includes(tf.key)) keys.push(tf.key); });
+          keys.forEach(k => {
+            map[k] = getCategoryFieldOptions(k);
+          });
+          return map;
+        })(),
+        categoryOptionOrdersTs: (() => {
+          const map = {};
+          const keys = ["tur", "surec", "uygunluk", "hat", "goz", "vardiya", "personel", "numuneSahibi", "urunTipi", "firma", "urun", "baz"];
+          (templateFields || []).forEach(tf => { if (tf && tf.key && !keys.includes(tf.key)) keys.push(tf.key); });
+          keys.forEach(k => {
+            const ts = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_TS_" + k);
+            map[k] = parseInt(ts || "0", 10);
+          });
+          return map;
+        })(),
         sidebarFacets: (typeof SIDEBAR_FACET_FIELDS !== "undefined" ? SIDEBAR_FACET_FIELDS : []),
         savedFilterLayouts: (typeof SAVED_FILTER_LAYOUTS !== "undefined" ? SAVED_FILTER_LAYOUTS : {}),
         savedViews: (typeof savedViews !== "undefined" ? savedViews : []),
@@ -13306,13 +13325,23 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
 
         // KRİTİK GÜVENLİK KALKANI: YEREL DEĞİŞİKLİKLERİ KORUMA MOTORU (Revert Engelleme)
         // Eğer kullanıcı tarafından açıkça "Buluttan Çek" istenmediyse:
-        // A) Kullanıcının bu bilgisayarda yaptığı henüz onaylanmamış bir yerel değişiklik varsa (hasUnsavedLocalUserEdits)
-        // B) Kullanıcı son 10 saniyede bir değişiklik yaptıysa (lastLocalUserEditTime)
-        // C) Gelen paket bu bilgisayarın gönderdiğinden daha eskiyse
-        // Eski uzak paketin yereldeki değişiklikleri geri döndürmesine (revert) KESİNLİKLE İZİN VERİLMEZ!
+        // A) Eski sürümden gelen "Master Veri / Liste Güncellemesi" döngü paketleri yutulur (revert önleme)
+        // B) Gelen paket yereldeki son mutasyondan daha eskiyse reddedilir
+        // C) Kullanıcının onay bekleyen yerel değişiklikleri varsa korunur
         if (!isUserInitiated) {
-          const isRecentLocalEdit = lastLocalUserEditTime && (Date.now() - lastLocalUserEditTime < 10000);
-          if (hasUnsavedLocalUserEdits || isRecentLocalEdit) {
+          if (db.action === "Master Veri / Liste Güncellemesi") {
+            console.warn("[Bulut Kalkanı] Eski sürümden gelen rogue Master Veri / Liste Güncellemesi paketi reddedildi, yerel liste sırası korundu.");
+            setCloudStatusReady(localCount);
+            return;
+          }
+
+          if (remoteTs < lastLocalMutationTime) {
+            console.warn(`[Bulut Kalkanı] Gelen uzak paket (${remoteTs}) yereldeki son eylemden (${lastLocalMutationTime}) daha eski. Reddedildi.`);
+            setCloudStatusReady(localCount);
+            return;
+          }
+
+          if (hasUnsavedLocalUserEdits) {
             console.warn(`[Bulut Kalkanı Engellemesi] Kullanıcı tarafından yapılan taze yerel değişiklikler korunuyor. Uzak paket reddedildi.`);
             setCloudStatusReady(localCount);
             return;
@@ -13423,6 +13452,9 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 const rTs = remoteField.updatedAt || 0;
                 const lTs = localField.updatedAt || 0;
 
+                const localOrderTs = parseInt(SafeStorage.getItem("LAB_ERP_OPTION_ORDER_TS_" + remoteField.key) || "0", 10);
+                const remoteOrderTs = (db.categoryOptionOrdersTs && db.categoryOptionOrdersTs[remoteField.key]) || rTs || 0;
+
                 // Seçenekleri birleştir: yerel ve uzak seçenekleri koru
                 let mergedOptions = undefined;
                 let mergedColors = undefined;
@@ -13431,11 +13463,16 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 if (Array.isArray(remoteField.options) || Array.isArray(localField.options)) {
                   const rOpts = Array.isArray(remoteField.options) ? remoteField.options : [];
                   const lOpts = Array.isArray(localField.options) ? localField.options : [];
-                  // Uzaktan gelen paket kabul edildiyse, uzaktaki sıralama (rOpts) önceliklidir
-                  if (rOpts.length > 0) {
+                  
+                  if (remoteOrderTs > localOrderTs || (isUserInitiated && remoteOrderTs >= localOrderTs)) {
+                    // Uzaktaki seçenek sıralaması gerçekten daha yeni
                     mergedOptions = Array.from(new Set([...rOpts, ...lOpts])).filter(Boolean);
+                    SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + remoteField.key, JSON.stringify(mergedOptions));
+                    SafeStorage.setItem("LAB_ERP_OPTION_ORDER_TS_" + remoteField.key, String(remoteOrderTs));
                   } else {
-                    mergedOptions = [...lOpts];
+                    // Yereldeki seçenek sıralaması daha yeni veya eşit -> YEREL SIRALAMAYI MUTLAK KORU!
+                    mergedOptions = Array.from(new Set([...lOpts, ...rOpts])).filter(Boolean);
+                    SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + remoteField.key, JSON.stringify(mergedOptions));
                   }
                   mergedColors = mergedOptions.map(opt => {
                     return mergedColorMap[opt] || getCategoryOptionColor(remoteField.key, opt) || "#e0e7ff";
@@ -13479,18 +13516,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             // Şablondaki seçeneklerin (options) sıralamasını master listelere de 100% yansıt
             templateFields.forEach(tf => {
               if (Array.isArray(tf.options) && tf.options.length > 0) {
-                if (tf.key === "baz") BAZ_LIST = [...tf.options];
-                else if (tf.key === "tur") TUR_LIST = [...tf.options];
-                else if (tf.key === "surec") SUREC_LIST = [...tf.options];
-                else if (tf.key === "uygunluk") UYGUNLUK_LIST = [...tf.options];
-                else if (tf.key === "hat") HAT_LIST = [...tf.options];
-                else if (tf.key === "goz") GOZ_LIST = [...tf.options];
-                else if (tf.key === "vardiya") VARDIYA_LIST = [...tf.options];
-                else if (tf.key === "personel") PERSONEL_LIST = [...tf.options];
-                else if (tf.key === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...tf.options];
-                else if (tf.key === "urunTipi") URUN_TIPI_LIST = [...tf.options];
-                else if (tf.key === "firma") FIRMA_LIST = [...tf.options];
-                else if (tf.key === "urun") URUN_LIST = [...tf.options];
+                applyCategoryOptionOrderToMemory(tf.key, tf.options);
               }
             });
             saveMasterDataToStorage();
@@ -13574,21 +13600,42 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             console.warn("Category sync UI refresh error:", catErr);
           }
 
-          // 8. Master listeler (Uzaktan kabul edilen otoriter sıralamayı benimse)
+          // 8. Master listeler (Yerel sıralama güncelse mutlak koru, sadece uzaktaki yeni öğeleri sona ekle)
           if (db.masterData && typeof db.masterData === "object") {
             const md = db.masterData;
-            if (Array.isArray(md.urunList) && md.urunList.length > 0) URUN_LIST = Array.from(new Set([...md.urunList, ...(URUN_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.hatList) && md.hatList.length > 0) HAT_LIST = Array.from(new Set([...md.hatList, ...(HAT_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.gozList) && md.gozList.length > 0) GOZ_LIST = Array.from(new Set([...md.gozList, ...(GOZ_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.personelList) && md.personelList.length > 0) PERSONEL_LIST = Array.from(new Set([...md.personelList, ...(PERSONEL_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = Array.from(new Set([...md.vardiyaList, ...(VARDIYA_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.turList) && md.turList.length > 0) TUR_LIST = Array.from(new Set([...md.turList, ...(TUR_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.surecList) && md.surecList.length > 0) SUREC_LIST = Array.from(new Set([...md.surecList, ...(SUREC_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.uygunlukList) && md.uygunlukList.length > 0) UYGUNLUK_LIST = Array.from(new Set([...md.uygunlukList, ...(UYGUNLUK_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.bazList) && md.bazList.length > 0) BAZ_LIST = Array.from(new Set([...md.bazList, ...(BAZ_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.numuneSahibiList) && md.numuneSahibiList.length > 0) NUMUNE_SAHIBI_LIST = Array.from(new Set([...md.numuneSahibiList, ...(NUMUNE_SAHIBI_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.urunTipiList) && md.urunTipiList.length > 0) URUN_TIPI_LIST = Array.from(new Set([...md.urunTipiList, ...(URUN_TIPI_LIST || [])])).filter(Boolean);
-            if (Array.isArray(md.firmaList) && md.firmaList.length > 0) FIRMA_LIST = Array.from(new Set([...md.firmaList, ...(FIRMA_LIST || [])])).filter(Boolean);
+            const syncMasterWithPreservation = (key, remoteArr, getLocalArr, setLocalArr) => {
+              if (!Array.isArray(remoteArr) || remoteArr.length === 0) return;
+              const localOrderTs = parseInt(SafeStorage.getItem("LAB_ERP_OPTION_ORDER_TS_" + key) || "0", 10);
+              const remoteOrderTs = (db.categoryOptionOrdersTs && db.categoryOptionOrdersTs[key]) ? parseInt(db.categoryOptionOrdersTs[key], 10) : 0;
+              const curLocal = getLocalArr() || [];
+              if (localOrderTs > remoteOrderTs && !isUserInitiated) {
+                // Yerel sıra daha güncel: Yerel sırayı koru, uzaktaki yeni öğeleri sona ekle
+                const preserved = Array.from(new Set([...curLocal, ...remoteArr])).filter(Boolean);
+                setLocalArr(preserved);
+                SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + key, JSON.stringify(preserved));
+              } else {
+                // Uzak sıra daha güncel veya eşit
+                const adopted = Array.from(new Set([...remoteArr, ...curLocal])).filter(Boolean);
+                setLocalArr(adopted);
+                if (remoteOrderTs > 0) {
+                  SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + key, JSON.stringify(adopted));
+                  SafeStorage.setItem("LAB_ERP_OPTION_ORDER_TS_" + key, String(remoteOrderTs));
+                }
+              }
+            };
+
+            syncMasterWithPreservation("urun", md.urunList, () => URUN_LIST, v => { URUN_LIST = v; });
+            syncMasterWithPreservation("hat", md.hatList, () => HAT_LIST, v => { HAT_LIST = v; });
+            syncMasterWithPreservation("goz", md.gozList, () => GOZ_LIST, v => { GOZ_LIST = v; });
+            syncMasterWithPreservation("personel", md.personelList, () => PERSONEL_LIST, v => { PERSONEL_LIST = v; });
+            syncMasterWithPreservation("vardiya", md.vardiyaList, () => VARDIYA_LIST, v => { VARDIYA_LIST = v; });
+            syncMasterWithPreservation("tur", md.turList, () => TUR_LIST, v => { TUR_LIST = v; });
+            syncMasterWithPreservation("surec", md.surecList, () => SUREC_LIST, v => { SUREC_LIST = v; });
+            syncMasterWithPreservation("uygunluk", md.uygunlukList, () => UYGUNLUK_LIST, v => { UYGUNLUK_LIST = v; });
+            syncMasterWithPreservation("baz", md.bazList, () => BAZ_LIST, v => { BAZ_LIST = v; });
+            syncMasterWithPreservation("numuneSahibi", md.numuneSahibiList, () => NUMUNE_SAHIBI_LIST, v => { NUMUNE_SAHIBI_LIST = v; });
+            syncMasterWithPreservation("urunTipi", md.urunTipiList, () => URUN_TIPI_LIST, v => { URUN_TIPI_LIST = v; });
+            syncMasterWithPreservation("firma", md.firmaList, () => FIRMA_LIST, v => { FIRMA_LIST = v; });
             saveMasterDataToStorage();
           }
 
@@ -21282,8 +21329,54 @@ function openTableModifierModal(e) {
     // ========================================================
     // KATEGORİ ALANLARI SEÇENEK YÖNETİM & SÜRÜKLE-BIRAK SIRALAMA MOTORU
     // ========================================================
+    function applyCategoryOptionOrderToMemory(fieldKey, newOrder) {
+      if (!Array.isArray(newOrder) || newOrder.length === 0) return;
+
+      // 1. Şablondaki alanı güncelle
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
+      if (f) {
+        f.options = [...newOrder];
+        if (Array.isArray(f.optionsColors)) {
+          f.optionsColors = newOrder.map(opt => getCategoryOptionColor(fieldKey, opt));
+        }
+      }
+
+      // 2. Global master listeyi güncelle
+      if (fieldKey === "tur") TUR_LIST = [...newOrder];
+      else if (fieldKey === "surec") SUREC_LIST = [...newOrder];
+      else if (fieldKey === "uygunluk") UYGUNLUK_LIST = [...newOrder];
+      else if (fieldKey === "hat") HAT_LIST = [...newOrder];
+      else if (fieldKey === "goz") GOZ_LIST = [...newOrder];
+      else if (fieldKey === "vardiya") VARDIYA_LIST = [...newOrder];
+      else if (fieldKey === "personel") PERSONEL_LIST = [...newOrder];
+      else if (fieldKey === "urun") URUN_LIST = [...newOrder];
+      else if (fieldKey === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...newOrder];
+      else if (fieldKey === "urunTipi") URUN_TIPI_LIST = [...newOrder];
+      else if (fieldKey === "firma") FIRMA_LIST = [...newOrder];
+      else if (fieldKey === "baz") {
+        BAZ_LIST = [...newOrder];
+        if (typeof renderModalBazButtons === "function") renderModalBazButtons();
+      }
+
+      // 3. Kalıcı depoya mühürle
+      try {
+        SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + fieldKey, JSON.stringify(newOrder));
+      } catch(e) {}
+    }
+
     function getCategoryFieldOptions(fieldKey) {
-      // 1. ŞABLON (templateFields) ÖNCELİKLİ: Kullanıcının şablonda belirlediği seçenekler ve sıralama tek gerçektir
+      // 0. MÜHÜRLÜ SEÇENEK SIRALAMASI (Tek ve Nihai Otoriter Sıralama)
+      try {
+        const sealedOrderJson = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_" + fieldKey);
+        if (sealedOrderJson) {
+          const sealedOrder = JSON.parse(sealedOrderJson);
+          if (Array.isArray(sealedOrder) && sealedOrder.length > 0) {
+            return sealedOrder;
+          }
+        }
+      } catch(e) {}
+
+      // 1. ŞABLON (templateFields) ÖNCELİKLİ: Kullanıcının şablonda belirlediği seçenekler ve sıralama
       const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       if (f && Array.isArray(f.options) && f.options.length > 0) {
         return f.options;
@@ -22427,6 +22520,12 @@ function openTableModifierModal(e) {
       if (!Array.isArray(newOrder) || newOrder.length === 0) return;
 
       const now = Date.now();
+
+      // MÜHÜRLÜ SEÇENEK SIRALAMASI VE ZAMAN DAMGASI KAYDI (Geri Dönmeyi 100% Önler)
+      SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + fieldKey, JSON.stringify(newOrder));
+      SafeStorage.setItem("LAB_ERP_OPTION_ORDER_TS_" + fieldKey, String(now));
+      applyCategoryOptionOrderToMemory(fieldKey, newOrder);
+
       const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       const currentOpts = getCategoryFieldOptions(fieldKey);
       const colorMap = {};
@@ -35127,14 +35226,12 @@ function closeModal() {
     // ==========================================
     function loadMasterDataFromStorage() {
       try {
-        const sUrun = SafeStorage.getItem("LAB_ERP_URUN_LIST");
+        const sUrun = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_urun") || SafeStorage.getItem("LAB_ERP_URUN_LIST");
         if (sUrun) {
           try {
             const parsed = JSON.parse(sUrun);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              parsed.forEach(p => {
-                if (p && !URUN_LIST.includes(p.trim())) URUN_LIST.push(p.trim());
-              });
+              URUN_LIST = [...parsed];
             }
           } catch(e) {}
         }
@@ -35175,35 +35272,47 @@ function closeModal() {
             }
           });
         }
-        const sGoz = SafeStorage.getItem("LAB_ERP_GOZ_LIST");
+        const sGoz = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_goz") || SafeStorage.getItem("LAB_ERP_GOZ_LIST");
         if (sGoz) {
-          const parsed = JSON.parse(sGoz);
-          if (Array.isArray(parsed) && parsed.length > 0) GOZ_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sGoz);
+            if (Array.isArray(parsed) && parsed.length > 0) GOZ_LIST = parsed;
+          } catch(e) {}
         }
-        const sHat = SafeStorage.getItem("LAB_ERP_HAT_LIST");
+        const sHat = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_hat") || SafeStorage.getItem("LAB_ERP_HAT_LIST");
         if (sHat) {
-          const parsed = JSON.parse(sHat);
-          if (Array.isArray(parsed) && parsed.length > 0) HAT_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sHat);
+            if (Array.isArray(parsed) && parsed.length > 0) HAT_LIST = parsed;
+          } catch(e) {}
         }
-        const sNS = SafeStorage.getItem("LAB_ERP_NUMUNE_SAHIBI_LIST");
+        const sNS = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_numuneSahibi") || SafeStorage.getItem("LAB_ERP_NUMUNE_SAHIBI_LIST");
         if (sNS) {
-          const parsed = JSON.parse(sNS);
-          if (Array.isArray(parsed) && parsed.length > 0) NUMUNE_SAHIBI_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sNS);
+            if (Array.isArray(parsed) && parsed.length > 0) NUMUNE_SAHIBI_LIST = parsed;
+          } catch(e) {}
         }
-        const sUT = SafeStorage.getItem("LAB_ERP_URUN_TIPI_LIST");
+        const sUT = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_urunTipi") || SafeStorage.getItem("LAB_ERP_URUN_TIPI_LIST");
         if (sUT) {
-          const parsed = JSON.parse(sUT);
-          if (Array.isArray(parsed) && parsed.length > 0) URUN_TIPI_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sUT);
+            if (Array.isArray(parsed) && parsed.length > 0) URUN_TIPI_LIST = parsed;
+          } catch(e) {}
         }
-        const sFirma = SafeStorage.getItem("LAB_ERP_FIRMA_LIST");
+        const sFirma = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_firma") || SafeStorage.getItem("LAB_ERP_FIRMA_LIST");
         if (sFirma) {
-          const parsed = JSON.parse(sFirma);
-          if (Array.isArray(parsed) && parsed.length > 0) FIRMA_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sFirma);
+            if (Array.isArray(parsed) && parsed.length > 0) FIRMA_LIST = parsed;
+          } catch(e) {}
         }
-        const sPersonel = SafeStorage.getItem("LAB_ERP_PERSONEL_LIST");
+        const sPersonel = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_personel") || SafeStorage.getItem("LAB_ERP_PERSONEL_LIST");
         if (sPersonel) {
-          const parsed = JSON.parse(sPersonel);
-          if (Array.isArray(parsed) && parsed.length > 0) PERSONEL_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sPersonel);
+            if (Array.isArray(parsed) && parsed.length > 0) PERSONEL_LIST = parsed;
+          } catch(e) {}
         }
         if (!PERSONEL_LIST.some(p => p.toLocaleLowerCase('tr-TR') === "tuncay ayar")) {
           PERSONEL_LIST.unshift("TUNCAY AYAR");
@@ -35211,23 +35320,29 @@ function closeModal() {
         SafeStorage.setItem("LAB_ERP_PERSONEL_LIST", JSON.stringify(PERSONEL_LIST));
 
         // Numune türü listesini zorunlu güncel tut
-        const sTur = SafeStorage.getItem("LAB_ERP_TUR_LIST");
+        const sTur = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_tur") || SafeStorage.getItem("LAB_ERP_TUR_LIST");
         if (sTur) {
-          const parsed = JSON.parse(sTur);
-          if (Array.isArray(parsed) && parsed.length > 0) TUR_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sTur);
+            if (Array.isArray(parsed) && parsed.length > 0) TUR_LIST = parsed;
+          } catch(e) {}
         } else {
           TUR_LIST = ["ÜRETİM", "SEVKİYAT", "HAMMADDE", "DOĞRULAMA", "AMBAR TARAMASI", "DIŞ ANALİZ", "MÜŞTERİ"];
           SafeStorage.setItem("LAB_ERP_TUR_LIST", JSON.stringify(TUR_LIST));
         }
-        const sVardiya = SafeStorage.getItem("LAB_ERP_VARDIYA_LIST");
+        const sVardiya = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_vardiya") || SafeStorage.getItem("LAB_ERP_VARDIYA_LIST");
         if (sVardiya) {
-          const parsed = JSON.parse(sVardiya);
-          if (Array.isArray(parsed) && parsed.length > 0) VARDIYA_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sVardiya);
+            if (Array.isArray(parsed) && parsed.length > 0) VARDIYA_LIST = parsed;
+          } catch(e) {}
         }
-        const sBaz = SafeStorage.getItem("LAB_ERP_BAZ_LIST");
+        const sBaz = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_baz") || SafeStorage.getItem("LAB_ERP_BAZ_LIST");
         if (sBaz) {
-          const parsed = JSON.parse(sBaz);
-          if (Array.isArray(parsed) && parsed.length > 0) BAZ_LIST = parsed;
+          try {
+            const parsed = JSON.parse(sBaz);
+            if (Array.isArray(parsed) && parsed.length > 0) BAZ_LIST = parsed;
+          } catch(e) {}
         }
         const sReq = SafeStorage.getItem("LAB_ERP_REQUIRED_FIELDS_CONFIG");
         if (sReq) {
@@ -36604,8 +36719,16 @@ function closeModal() {
             if (tf) {
               if (!Array.isArray(tf.options)) tf.options = [];
               const currentList = Array.isArray(syncMap[key]) ? syncMap[key] : [];
-              // Her iki kaynağı birleştir: tf.options öncelikli sıralama, master listelerdeki yeni öğeler de listenin sonuna eklenir
-              const merged = Array.from(new Set([...tf.options, ...currentList])).filter(Boolean);
+              const sealed = SafeStorage.getItem("LAB_ERP_OPTION_ORDER_" + key);
+              let baseList = tf.options;
+              if (sealed) {
+                try {
+                  const p = JSON.parse(sealed);
+                  if (Array.isArray(p) && p.length > 0) baseList = p;
+                } catch(e) {}
+              }
+              // Her iki kaynağı birleştir: mühürlü sıralama öncelikli, master listelerdeki yeni öğeler listenin sonuna eklenir
+              const merged = Array.from(new Set([...baseList, ...currentList])).filter(Boolean);
               tf.options = [...merged];
               if (key === "baz") BAZ_LIST = [...merged];
               else if (key === "tur") TUR_LIST = [...merged];
@@ -36619,6 +36742,7 @@ function closeModal() {
               else if (key === "urunTipi") URUN_TIPI_LIST = [...merged];
               else if (key === "firma") FIRMA_LIST = [...merged];
               else if (key === "urun") URUN_LIST = [...merged];
+              SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + key, JSON.stringify(merged));
             }
           });
         }
@@ -36726,167 +36850,178 @@ function closeModal() {
     function refreshModalDropdownsOnly() {
       renderModalBazButtons();
 
-
-      setOpts("modalProduct", URUN_LIST);
-      setOpts("modalHat", HAT_LIST);
-      setOpts("modalGoz", GOZ_LIST);
-      setOpts("modalVardiya", VARDIYA_LIST);
-      setOpts("modalTur", TUR_LIST);
-      setOpts("modalSurec", SUREC_LIST);
-      setOpts("modalUygunluk", UYGUNLUK_LIST);
+      setOpts("modalProduct", getCategoryFieldOptions("urun"));
+      setOpts("modalHat", getCategoryFieldOptions("hat"));
+      setOpts("modalGoz", getCategoryFieldOptions("goz"));
+      setOpts("modalVardiya", getCategoryFieldOptions("vardiya"));
+      setOpts("modalTur", getCategoryFieldOptions("tur"));
+      setOpts("modalSurec", getCategoryFieldOptions("surec"));
+      setOpts("modalUygunluk", getCategoryFieldOptions("uygunluk"));
       buildPersonelCheckboxes();
-      setOpts("modalNumuneSahibi", NUMUNE_SAHIBI_LIST);
-      setOpts("modalUrunTipi", URUN_TIPI_LIST);
+      setOpts("modalNumuneSahibi", getCategoryFieldOptions("numuneSahibi"));
+      setOpts("modalUrunTipi", getCategoryFieldOptions("urunTipi"));
       const firmaDl = document.getElementById("firmaDatalist");
-      if (firmaDl && Array.isArray(FIRMA_LIST)) {
-        firmaDl.innerHTML = FIRMA_LIST.map(f => `<option value="${escapeHtml(f)}">`).join("");
+      const curFirmaList = getCategoryFieldOptions("firma");
+      if (firmaDl && Array.isArray(curFirmaList)) {
+        firmaDl.innerHTML = curFirmaList.map(f => `<option value="${escapeHtml(f)}">`).join("");
       }
     }
 
     function refreshAllDropdowns() {
       refreshModalDropdownsOnly();
+
+      const curUrun = getCategoryFieldOptions("urun");
+      const curHat = getCategoryFieldOptions("hat");
+      const curGoz = getCategoryFieldOptions("goz");
+      const curVardiya = getCategoryFieldOptions("vardiya");
+      const curTur = getCategoryFieldOptions("tur");
+      const curSurec = getCategoryFieldOptions("surec");
+      const curUygunluk = getCategoryFieldOptions("uygunluk");
+      const curPersonel = getCategoryFieldOptions("personel");
+
       // 1. modalProduct
       const modalProdEl = document.getElementById("modalProduct");
       if (modalProdEl) {
         const cur = modalProdEl.value;
-        modalProdEl.innerHTML = URUN_LIST.map(u => `<option value="${u}">${u}</option>`).join("");
-        if (URUN_LIST.includes(cur)) modalProdEl.value = cur;
-        else if (URUN_LIST.length > 0) modalProdEl.value = URUN_LIST[0];
+        modalProdEl.innerHTML = curUrun.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+        if (curUrun.includes(cur)) modalProdEl.value = cur;
+        else if (curUrun.length > 0) modalProdEl.value = curUrun[0];
       }
 
       // 2. modalHat
       const modalHatEl = document.getElementById("modalHat");
       if (modalHatEl) {
         const cur = modalHatEl.value;
-        modalHatEl.innerHTML = HAT_LIST.map(h => `<option value="${h}">${h}</option>`).join("");
-        if (HAT_LIST.includes(cur)) modalHatEl.value = cur;
-        else if (HAT_LIST.length > 0) modalHatEl.value = HAT_LIST[0];
+        modalHatEl.innerHTML = curHat.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+        if (curHat.includes(cur)) modalHatEl.value = cur;
+        else if (curHat.length > 0) modalHatEl.value = curHat[0];
       }
 
       // 3. modalGoz
       const modalGozEl = document.getElementById("modalGoz");
       if (modalGozEl) {
         const cur = modalGozEl.value;
-        modalGozEl.innerHTML = GOZ_LIST.map(g => `<option value="${g}">${g}</option>`).join("");
-        if (GOZ_LIST.includes(cur)) modalGozEl.value = cur;
-        else if (GOZ_LIST.length > 0) modalGozEl.value = GOZ_LIST[0];
+        modalGozEl.innerHTML = curGoz.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+        if (curGoz.includes(cur)) modalGozEl.value = cur;
+        else if (curGoz.length > 0) modalGozEl.value = curGoz[0];
       }
 
       // 4. modalVardiya
       const modalVardiyaEl = document.getElementById("modalVardiya");
       if (modalVardiyaEl) {
         const cur = modalVardiyaEl.value;
-        modalVardiyaEl.innerHTML = VARDIYA_LIST.map(v => `<option value="${v}">${v}</option>`).join("");
-        if (VARDIYA_LIST.includes(cur)) modalVardiyaEl.value = cur;
-        else if (VARDIYA_LIST.length > 0) modalVardiyaEl.value = VARDIYA_LIST[0];
+        modalVardiyaEl.innerHTML = curVardiya.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+        if (curVardiya.includes(cur)) modalVardiyaEl.value = cur;
+        else if (curVardiya.length > 0) modalVardiyaEl.value = curVardiya[0];
       }
 
       // 4b. modalTur (Numune Türü)
       const modalTurEl = document.getElementById("modalTur");
       if (modalTurEl) {
         const cur = modalTurEl.value;
-        modalTurEl.innerHTML = TUR_LIST.map(t => `<option value="${t}">${t}</option>`).join("");
-        if (TUR_LIST.includes(cur)) modalTurEl.value = cur;
-        else if (TUR_LIST.length > 0) modalTurEl.value = TUR_LIST[0];
+        modalTurEl.innerHTML = curTur.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+        if (curTur.includes(cur)) modalTurEl.value = cur;
+        else if (curTur.length > 0) modalTurEl.value = curTur[0];
       }
 
       // 4c. modalSurec (Süreç Durumu)
       const modalSurecEl = document.getElementById("modalSurec");
       if (modalSurecEl) {
         const cur = modalSurecEl.value;
-        modalSurecEl.innerHTML = SUREC_LIST.map(s => `<option value="${s}">${s}</option>`).join("");
-        if (SUREC_LIST.includes(cur)) modalSurecEl.value = cur;
-        else if (SUREC_LIST.length > 0) modalSurecEl.value = SUREC_LIST[0];
+        modalSurecEl.innerHTML = curSurec.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+        if (curSurec.includes(cur)) modalSurecEl.value = cur;
+        else if (curSurec.length > 0) modalSurecEl.value = curSurec[0];
       }
 
       // 4d. modalUygunluk (Kalite Uygunluk Durumu)
       const modalUygunlukEl = document.getElementById("modalUygunluk");
       if (modalUygunlukEl) {
         const cur = modalUygunlukEl.value;
-        modalUygunlukEl.innerHTML = UYGUNLUK_LIST.map(u => `<option value="${u}">${u}</option>`).join("");
-        if (UYGUNLUK_LIST.includes(cur)) modalUygunlukEl.value = cur;
-        else if (UYGUNLUK_LIST.length > 0) modalUygunlukEl.value = UYGUNLUK_LIST[0];
+        modalUygunlukEl.innerHTML = curUygunluk.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+        if (curUygunluk.includes(cur)) modalUygunlukEl.value = cur;
+        else if (curUygunluk.length > 0) modalUygunlukEl.value = curUygunluk[0];
       }
 
       // 5. personel checkboxes
       buildPersonelCheckboxes();
-      setOpts("modalNumuneSahibi", NUMUNE_SAHIBI_LIST);
-      setOpts("modalUrunTipi", URUN_TIPI_LIST);
+      setOpts("modalNumuneSahibi", getCategoryFieldOptions("numuneSahibi"));
+      setOpts("modalUrunTipi", getCategoryFieldOptions("urunTipi"));
       const firmaDl = document.getElementById("firmaDatalist");
-      if (firmaDl && Array.isArray(FIRMA_LIST)) {
-        firmaDl.innerHTML = FIRMA_LIST.map(f => `<option value="${escapeHtml(f)}">`).join("");
+      const curFirmaList = getCategoryFieldOptions("firma");
+      if (firmaDl && Array.isArray(curFirmaList)) {
+        firmaDl.innerHTML = curFirmaList.map(f => `<option value="${escapeHtml(f)}">`).join("");
       }
 
       // 6. Tablo Filtreleri
       const fUrun = document.getElementById("f_urun");
       if (fUrun) {
         const cur = fUrun.value;
-        fUrun.innerHTML = `<option value="ALL">Tüm Ürünler</option>` + URUN_LIST.map(u => `<option value="${u}">${u}</option>`).join("");
-        if (cur && (cur === "ALL" || URUN_LIST.includes(cur))) fUrun.value = cur;
+        fUrun.innerHTML = `<option value="ALL">Tüm Ürünler</option>` + curUrun.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+        if (cur && (cur === "ALL" || curUrun.includes(cur))) fUrun.value = cur;
       }
 
       const fHat = document.getElementById("f_hat");
       if (fHat) {
         const cur = fHat.value;
-        fHat.innerHTML = `<option value="ALL">Hat (Tümü)</option>` + HAT_LIST.map(h => `<option value="${h}">${h}</option>`).join("");
-        if (cur && (cur === "ALL" || HAT_LIST.includes(cur))) fHat.value = cur;
+        fHat.innerHTML = `<option value="ALL">Hat (Tümü)</option>` + curHat.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+        if (cur && (cur === "ALL" || curHat.includes(cur))) fHat.value = cur;
       }
 
       const fGoz = document.getElementById("f_goz");
       if (fGoz) {
         const cur = fGoz.value;
-        fGoz.innerHTML = `<option value="ALL">Göz (Tümü)</option>` + GOZ_LIST.map(g => `<option value="${g}">${g}</option>`).join("");
-        if (cur && (cur === "ALL" || GOZ_LIST.includes(cur))) fGoz.value = cur;
+        fGoz.innerHTML = `<option value="ALL">Göz (Tümü)</option>` + curGoz.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+        if (cur && (cur === "ALL" || curGoz.includes(cur))) fGoz.value = cur;
       }
 
       const fVardiya = document.getElementById("f_vardiya");
       if (fVardiya) {
         const cur = fVardiya.value;
-        fVardiya.innerHTML = `<option value="ALL">Vardiya (Tümü)</option>` + VARDIYA_LIST.map(v => `<option value="${v}">${v}</option>`).join("");
-        if (cur && (cur === "ALL" || VARDIYA_LIST.includes(cur))) fVardiya.value = cur;
+        fVardiya.innerHTML = `<option value="ALL">Vardiya (Tümü)</option>` + curVardiya.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+        if (cur && (cur === "ALL" || curVardiya.includes(cur))) fVardiya.value = cur;
       }
 
       const fPersonel = document.getElementById("f_personel");
       if (fPersonel) {
         const cur = fPersonel.value;
-        fPersonel.innerHTML = `<option value="ALL">Personel (Tümü)</option>` + PERSONEL_LIST.map(p => `<option value="${p}">${p}</option>`).join("");
-        if (cur && (cur === "ALL" || PERSONEL_LIST.includes(cur))) fPersonel.value = cur;
+        fPersonel.innerHTML = `<option value="ALL">Personel (Tümü)</option>` + curPersonel.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+        if (cur && (cur === "ALL" || curPersonel.includes(cur))) fPersonel.value = cur;
       }
 
       // 7. Kayıtlı Filtre Düzenleme Dropdownları
       const editFUrun = document.getElementById("edit_f_urun");
       if (editFUrun) {
         const cur = editFUrun.value;
-        editFUrun.innerHTML = `<option value="ALL">Tüm Ürünler</option>` + URUN_LIST.map(u => `<option value="${u}">${u}</option>`).join("");
-        if (cur && (cur === "ALL" || URUN_LIST.includes(cur))) editFUrun.value = cur;
+        editFUrun.innerHTML = `<option value="ALL">Tüm Ürünler</option>` + curUrun.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
+        if (cur && (cur === "ALL" || curUrun.includes(cur))) editFUrun.value = cur;
       }
 
       const editFHat = document.getElementById("edit_f_hat");
       if (editFHat) {
         const cur = editFHat.value;
-        editFHat.innerHTML = `<option value="ALL">Hat (Tümü)</option>` + HAT_LIST.map(h => `<option value="${h}">${h}</option>`).join("");
-        if (cur && (cur === "ALL" || HAT_LIST.includes(cur))) editFHat.value = cur;
+        editFHat.innerHTML = `<option value="ALL">Hat (Tümü)</option>` + curHat.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+        if (cur && (cur === "ALL" || curHat.includes(cur))) editFHat.value = cur;
       }
 
       const editFGoz = document.getElementById("edit_f_goz");
       if (editFGoz) {
         const cur = editFGoz.value;
-        editFGoz.innerHTML = `<option value="ALL">Göz (Tümü)</option>` + GOZ_LIST.map(g => `<option value="${g}">${g}</option>`).join("");
-        if (cur && (cur === "ALL" || GOZ_LIST.includes(cur))) editFGoz.value = cur;
+        editFGoz.innerHTML = `<option value="ALL">Göz (Tümü)</option>` + curGoz.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join("");
+        if (cur && (cur === "ALL" || curGoz.includes(cur))) editFGoz.value = cur;
       }
 
       const editFVardiya = document.getElementById("edit_f_vardiya");
       if (editFVardiya) {
         const cur = editFVardiya.value;
-        editFVardiya.innerHTML = `<option value="ALL">Vardiya (Tümü)</option>` + VARDIYA_LIST.map(v => `<option value="${v}">${v}</option>`).join("");
-        if (cur && (cur === "ALL" || VARDIYA_LIST.includes(cur))) editFVardiya.value = cur;
+        editFVardiya.innerHTML = `<option value="ALL">Vardiya (Tümü)</option>` + curVardiya.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+        if (cur && (cur === "ALL" || curVardiya.includes(cur))) editFVardiya.value = cur;
       }
 
       const editFPersonel = document.getElementById("edit_f_personel");
       if (editFPersonel) {
         const cur = editFPersonel.value;
-        editFPersonel.innerHTML = `<option value="ALL">Personel (Tümü)</option>` + PERSONEL_LIST.map(p => `<option value="${p}">${p}</option>`).join("");
-        if (cur && (cur === "ALL" || PERSONEL_LIST.includes(cur))) editFPersonel.value = cur;
+        editFPersonel.innerHTML = `<option value="ALL">Personel (Tümü)</option>` + curPersonel.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+        if (cur && (cur === "ALL" || curPersonel.includes(cur))) editFPersonel.value = cur;
       }
 
       // Tablo satırlarını yeniden hesapla
