@@ -12029,11 +12029,12 @@ const DEFAULT_TEMPLATE_FIELDS = [
 
       // 2. Yeni kategoriyi listeye ve depolamaya kaydet
       const customCats = getSavedCustomCategories();
+      newCat.updatedAt = Date.now();
       customCats.push(newCat);
-      SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(customCats));
+      saveCustomCategoriesToStorage(customCats, `Yeni Kategori Eklendi: ${shortName}`);
 
       syncTemplateSectionsMeta();
-      SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(order));
+      saveCategorySectionOrderToStorage(order, `Yeni Kategori Sıralaması: ${shortName}`);
 
       // 1. Önce kategori ekleme modalını kapat
       closeAddCategoryModal();
@@ -12088,13 +12089,13 @@ const DEFAULT_TEMPLATE_FIELDS = [
       // 3. Özel kategori ise kalıcı sil, standart kategori ise çıkarılanlar listesine kaydet
       if (meta && meta.isCustom) {
         const customCats = getSavedCustomCategories().filter(c => c.id !== secId);
-        SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(customCats));
+        saveCustomCategoriesToStorage(customCats, `Özel Kategori Silindi: ${secName}`);
         if (catEl) catEl.remove();
       } else {
         const removedIds = getSavedRemovedCategories();
         if (!removedIds.includes(secId)) {
           removedIds.push(secId);
-          SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(removedIds));
+          saveRemovedCategoriesToStorage(removedIds, `Standart Kategori Çıkarıldı: ${secName}`);
         }
         if (catEl) {
           catEl.classList.add("hidden");
@@ -12106,7 +12107,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
 
       // 4. Sıralamadan çıkar ve tazele
       const newOrder = getSavedTemplateSectionOrder().filter(id => id !== secId);
-      SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(newOrder));
+      saveCategorySectionOrderToStorage(newOrder, `Kategori Çıkarıldı Sıra Güncellemesi: ${secName}`);
 
       applyTemplateSectionOrder(newOrder, true);
       refreshCategorySelectDropdowns();
@@ -12122,7 +12123,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
 
     function restoreTemplateCategory(secId) {
       const removedIds = getSavedRemovedCategories().filter(id => id !== secId);
-      SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(removedIds));
+      saveRemovedCategoriesToStorage(removedIds, `Kategori Geri Yüklendi: ${secId}`);
 
       syncTemplateSectionsMeta();
 
@@ -12262,9 +12263,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
       if (auditCard && auditCard.parentNode === body) body.appendChild(auditCard);
 
       if (shouldSave) {
-        try {
-          SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(order));
-        } catch(e) {}
+        saveCategorySectionOrderToStorage(order, "Kategori Sıralaması Güncellemesi");
       }
 
       // Tablo sütun sırasını da derhal güncellenen DOM sıralamasına göre senkronize et!
@@ -12342,10 +12341,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         }
       }
 
-      // Sıralamayı kalıcı hafızaya kaydet
-      try {
-        SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(fullOrder));
-      } catch(e) {}
+      // Sıralamayı kalıcı hafızaya kaydet ve buluta derhal ilet
+      saveCategorySectionOrderToStorage(fullOrder, `Kategori Taşıma: ${secName}`);
 
       // Tablo ve sol paleti senkronize et
       if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
@@ -13071,6 +13068,12 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         deletedFacets: JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_FACETS") || "[]"),
         deletedViews: JSON.parse(SafeStorage.getItem("LAB_ERP_DELETED_VIEWS") || "[]"),
         templateFields: templateFields || [],
+        templateSectionOrder: (typeof getSavedTemplateSectionOrder === "function" ? getSavedTemplateSectionOrder() : JSON.parse(SafeStorage.getItem("LAB_ERP_TEMPLATE_SECTION_ORDER") || "[]")),
+        templateSectionOrderTs: parseInt(SafeStorage.getItem("LAB_ERP_SECTION_ORDER_TS") || "0", 10),
+        customCategories: (typeof getSavedCustomCategories === "function" ? getSavedCustomCategories() : JSON.parse(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES") || "[]")),
+        customCategoriesTs: parseInt(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES_TS") || "0", 10),
+        removedCategories: (typeof getSavedRemovedCategories === "function" ? getSavedRemovedCategories() : JSON.parse(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES") || "[]")),
+        removedCategoriesTs: parseInt(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES_TS") || "0", 10),
         sidebarFacets: (typeof SIDEBAR_FACET_FIELDS !== "undefined" ? SIDEBAR_FACET_FIELDS : []),
         savedFilterLayouts: (typeof SAVED_FILTER_LAYOUTS !== "undefined" ? SAVED_FILTER_LAYOUTS : {}),
         savedViews: (typeof savedViews !== "undefined" ? savedViews : []),
@@ -13343,9 +13346,46 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             SafeStorage.setItem("LAB_ERP_RAW_MATERIAL_SPECS", JSON.stringify(RAW_MATERIAL_SPECS));
           }
 
-          // 7. Şablon alanları (Form modifier açık değilse)
+          // 7. ŞABLON ALANLARI: KULLANICI KURALI -> BÜTÜN ŞABLONU AKTARMAK YERİNE ALAN ÖZELİNDE AKILLI BİRLEŞTİRME (GRANULAR MERGE)
           if (Array.isArray(db.templateFields) && db.templateFields.length > 0 && !(typeof liveFormModifierMode !== "undefined" && liveFormModifierMode)) {
-            templateFields = db.templateFields;
+            const localFieldsMap = new Map();
+            (templateFields || []).forEach(f => { if (f && f.key) localFieldsMap.set(f.key, f); });
+
+            let templateChanged = false;
+            const mergedFields = [];
+
+            // Uzaktan gelen alanları yerel alanlarla alan-özelinde karşılaştır
+            db.templateFields.forEach(remoteField => {
+              if (!remoteField || !remoteField.key) return;
+              const localField = localFieldsMap.get(remoteField.key);
+
+              if (!localField) {
+                // Bu bilgisayarda olmayan yeni bir alan uzakta eklenmiş -> ekle
+                mergedFields.push(remoteField);
+                templateChanged = true;
+              } else {
+                // İki bilgisayarda da var -> Hangi alanda en son değişiklik yapıldıysa o alanın güncellemesini kabul et
+                const rTs = remoteField.updatedAt || remoteTs || 0;
+                const lTs = localField.updatedAt || 0;
+
+                if (rTs >= lTs || isUserInitiated) {
+                  // Uzaktaki bu alan daha güncel veya eşit -> uzaktaki alanı kullan
+                  mergedFields.push(Object.assign({}, localField, remoteField));
+                  templateChanged = true;
+                } else {
+                  // Yereldeki bu alan daha yeni düzenlenmiş -> yereldeki alanın güncel halini koru!
+                  mergedFields.push(localField);
+                }
+                localFieldsMap.delete(remoteField.key);
+              }
+            });
+
+            // Yerelde olup henüz uzakta olmayan yerel alanları da koru
+            localFieldsMap.forEach(remainingLocalField => {
+              mergedFields.push(remainingLocalField);
+            });
+
+            templateFields = mergedFields;
             SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
             customFields = templateFields.filter(f => !f.isStandard && f.enabled);
             SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
@@ -13368,6 +13408,49 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
               }
             });
             saveMasterDataToStorage();
+          }
+
+          // 7.1. KULLANICI KURALI: KATEGORİ VE KATEGORİ SIRALAMASI SENKRONİZASYONU
+          // Diğer bilgisayarda yapılan kategori yeri veya özel kategori ekleme/silme değişikliklerini anında yansıt
+          const localOrderTs = parseInt(SafeStorage.getItem("LAB_ERP_SECTION_ORDER_TS") || "0", 10);
+          const remoteOrderTs = parseInt(db.templateSectionOrderTs || (db.timestamp || 0), 10);
+
+          if (Array.isArray(db.templateSectionOrder) && db.templateSectionOrder.length > 0) {
+            if (remoteOrderTs >= localOrderTs || isUserInitiated) {
+              SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(db.templateSectionOrder));
+              SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(remoteOrderTs));
+            }
+          }
+
+          const localCustomCatsTs = parseInt(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES_TS") || "0", 10);
+          const remoteCustomCatsTs = parseInt(db.customCategoriesTs || (db.timestamp || 0), 10);
+
+          if (Array.isArray(db.customCategories)) {
+            if (remoteCustomCatsTs >= localCustomCatsTs || isUserInitiated) {
+              SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(db.customCategories));
+              SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES_TS", String(remoteCustomCatsTs));
+            }
+          }
+
+          const localRemovedCatsTs = parseInt(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES_TS") || "0", 10);
+          const remoteRemovedCatsTs = parseInt(db.removedCategoriesTs || (db.timestamp || 0), 10);
+
+          if (Array.isArray(db.removedCategories)) {
+            if (remoteRemovedCatsTs >= localRemovedCatsTs || isUserInitiated) {
+              SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(db.removedCategories));
+              SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES_TS", String(remoteRemovedCatsTs));
+            }
+          }
+
+          // Kategori DOM kartlarını, meta verilerini ve şablon sırasını güncelle
+          try {
+            syncTemplateSectionsMeta();
+            renderCustomCategoryCardsInDOM();
+            applyTemplateSectionOrder(null, false);
+            refreshCategorySelectDropdowns();
+            renderModifierSectionOrderList();
+          } catch(catErr) {
+            console.warn("Category sync UI refresh error:", catErr);
           }
 
           // 8. Master listeler
@@ -37284,13 +37367,66 @@ function closeModal() {
       syncAllColumnsFromTemplateFields();
     }
 
-    function saveTemplateFieldsToStorage() {
+    
+    // ========================================================
+    // ŞABLON & KATEGORİ ALAN BAZLI AKILLI SENKRONİZASYON MOTORU
+    // ========================================================
+    function saveCategorySectionOrderToStorage(order, actionDesc = "Kategori Sıralaması") {
       try {
+        SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(order));
+        SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(Date.now()));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified(actionDesc);
+          }
+        }
+      } catch(e) {}
+    }
+
+    function saveCustomCategoriesToStorage(customCats, actionDesc = "Özel Kategori Güncellemesi") {
+      try {
+        SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(customCats));
+        SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES_TS", String(Date.now()));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified(actionDesc);
+          }
+        }
+      } catch(e) {}
+    }
+
+    function saveRemovedCategoriesToStorage(removedIds, actionDesc = "Kategori Çıkarma") {
+      try {
+        SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(removedIds));
+        SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES_TS", String(Date.now()));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified(actionDesc);
+          }
+        }
+      } catch(e) {}
+    }
+
+    function saveTemplateFieldsToStorage(modifiedKey = null) {
+      try {
+        const now = Date.now();
+        // Eğer belirli bir alan veya tüm alanlar değiştirildiyse zaman damgasını güncelle
+        if (Array.isArray(templateFields)) {
+          templateFields.forEach(tf => {
+            if (!tf.updatedAt) tf.updatedAt = now;
+            if (modifiedKey && tf.key === modifiedKey) {
+              tf.updatedAt = now;
+            }
+          });
+        }
         SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
         if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
             typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
           if (typeof markLocalDatabaseModified === "function") {
-            markLocalDatabaseModified("Şablon Alanları Güncellemesi");
+            markLocalDatabaseModified(modifiedKey ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
           }
         }
       } catch (e) {
