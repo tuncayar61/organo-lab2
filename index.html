@@ -12976,6 +12976,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     let lastCloudAction = "Hazır";
     let lastLocalMutationTime = parseInt(SafeStorage.getItem("LAB_ERP_LAST_ACTION_TS") || "0", 10) || 0;
     let localDatabaseRevision = parseInt(SafeStorage.getItem("LAB_ERP_DB_REVISION") || "1", 10) || 1;
+    let lastAppliedRemoteTimestamp = parseInt(SafeStorage.getItem("LAB_ERP_LAST_APPLIED_REMOTE_TS") || "0", 10) || 0;
+    let lastAppliedRemoteRevision = parseInt(SafeStorage.getItem("LAB_ERP_LAST_APPLIED_REMOTE_REV") || "0", 10) || 0;
 
     function extractBundleFromRemote(remoteDb) {
       if (!remoteDb) return null;
@@ -13193,6 +13195,14 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           }
         });
 
+        firebaseSseSource.addEventListener("patch", function(e) {
+          try {
+            triggerFirebasePull(false);
+          } catch(err) {
+            console.warn("Firebase SSE patch uyarısı:", err);
+          }
+        });
+
         firebaseSseSource.onerror = function() {
           try { if (firebaseSseSource) firebaseSseSource.close(); } catch(e) {}
           firebaseSseSource = null;
@@ -13274,15 +13284,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           }
         }
 
-        // "EN SON HANGİ CİHAZDA GÜNCELLEME YAPILDIYSA O KALSIN (OTORİTER MASTER MODELİ)"
-        // Uzaktaki güncelleme zamanı yerelden yeniyse VEYA revizyon daha büyükse VEYA yerel boşsa VEYA kullanıcı "Eşitle" dediyse:
-        const isRemoteAuthoritative = (localCount === 0 && remoteCount > 0) ||
-                                      (remoteTs > lastLocalMutationTime) ||
-                                      (remoteRev > localDatabaseRevision) ||
-                                      isUserInitiated;
-
-        if (!isRemoteAuthoritative) {
-          // Bu cihazdaki yerel durum daha güncel veya eşit. Uzaktaki eski veriyi KESİNLİKLE kabul etme!
+        // Eğer bu uzaktan gelen paketi zaten başarıyla uyguladıysak ve kullanıcı açıkça yenileme istemediyse atla
+        if (typeof lastAppliedRemoteTimestamp !== "undefined" && lastAppliedRemoteTimestamp && lastAppliedRemoteTimestamp === remoteTs &&
+            typeof lastAppliedRemoteRevision !== "undefined" && lastAppliedRemoteRevision && lastAppliedRemoteRevision === remoteRev &&
+            !isUserInitiated) {
           setCloudStatusReady(localCount);
           return;
         }
@@ -13319,8 +13324,29 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           (db.deletedViews || []).forEach(vId => allDelViews.add(vId));
           SafeStorage.setItem("LAB_ERP_DELETED_VIEWS", JSON.stringify(Array.from(allDelViews)));
 
-          // 4. Kayıtları doğrudan ata (Otoriter master doğrudan geçerlidir)
-          labRecords = Array.isArray(db.records) ? db.records : [];
+          // 4. Kayıtları akıllı birleştir (Otoriter uzak canlı kayıtları ve henüz uzakta olmayan yerel kayıtları koru)
+          const remoteRecords = Array.isArray(db.records) ? db.records : [];
+          const remoteRecordMap = new Map();
+          remoteRecords.forEach(r => { if (r && r.id) remoteRecordMap.set(String(r.id), r); });
+
+          const finalRecords = [];
+          // A) Uzaktan gelen canlı kayıtlar (silinenler hariç)
+          remoteRecords.forEach(r => {
+            if (r && r.id && !allDeletedIds.has(String(r.id))) {
+              finalRecords.push(r);
+            }
+          });
+
+          // B) Yerelde olup henüz uzakta olmayan yeni kayıtlar (silinenler hariç)
+          let hasLocalUnsyncedRecords = false;
+          (labRecords || []).forEach(lr => {
+            if (lr && lr.id && !remoteRecordMap.has(String(lr.id)) && !allDeletedIds.has(String(lr.id))) {
+              finalRecords.push(lr);
+              hasLocalUnsyncedRecords = true;
+            }
+          });
+
+          labRecords = finalRecords;
           deletedRecords = (Array.isArray(db.deletedRecords) ? db.deletedRecords : []).filter(d => d && !remoteLiveIds.has(String(d.id)));
           saveDeletedRecordsToStorage();
 
@@ -13370,13 +13396,43 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
                 const rTs = remoteField.updatedAt || remoteTs || 0;
                 const lTs = localField.updatedAt || 0;
 
+                // Seçenekleri birleştir: iki taraftaki seçenekleri de koru (silinmeyi önle)
+                let mergedOptions = undefined;
+                let mergedColors = undefined;
+                let mergedColorMap = Object.assign({}, localField.optionColorsMap || {}, remoteField.optionColorsMap || {});
+
+                if (Array.isArray(remoteField.options) || Array.isArray(localField.options)) {
+                  const rOpts = Array.isArray(remoteField.options) ? remoteField.options : [];
+                  const lOpts = Array.isArray(localField.options) ? localField.options : [];
+                  if (rTs >= lTs || isUserInitiated) {
+                    mergedOptions = Array.from(new Set([...rOpts, ...lOpts])).filter(Boolean);
+                  } else {
+                    mergedOptions = Array.from(new Set([...lOpts, ...rOpts])).filter(Boolean);
+                  }
+                  mergedColors = mergedOptions.map(opt => {
+                    return mergedColorMap[opt] || getCategoryOptionColor(remoteField.key, opt) || "#e0e7ff";
+                  });
+                }
+
                 if (rTs >= lTs || isUserInitiated) {
                   // Uzaktaki bu alan daha güncel veya eşit -> uzaktaki alanı kullan
-                  mergedFields.push(Object.assign({}, localField, remoteField));
+                  const mergedFieldObj = Object.assign({}, localField, remoteField);
+                  if (mergedOptions) {
+                    mergedFieldObj.options = mergedOptions;
+                    mergedFieldObj.optionsColors = mergedColors;
+                    mergedFieldObj.optionColorsMap = mergedColorMap;
+                  }
+                  mergedFields.push(mergedFieldObj);
                   templateChanged = true;
                 } else {
                   // Yereldeki bu alan daha yeni düzenlenmiş -> yereldeki alanın güncel halini koru!
-                  mergedFields.push(localField);
+                  const mergedFieldObj = Object.assign({}, remoteField, localField);
+                  if (mergedOptions) {
+                    mergedFieldObj.options = mergedOptions;
+                    mergedFieldObj.optionsColors = mergedColors;
+                    mergedFieldObj.optionColorsMap = mergedColorMap;
+                  }
+                  mergedFields.push(mergedFieldObj);
                 }
                 localFieldsMap.delete(remoteField.key);
               }
@@ -13490,21 +13546,21 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             console.warn("Category sync UI refresh error:", catErr);
           }
 
-          // 8. Master listeler
+          // 8. Master listeler (İki bilgisayardaki listeleri birleştirerek koru)
           if (db.masterData && typeof db.masterData === "object") {
             const md = db.masterData;
-            if (Array.isArray(md.urunList) && md.urunList.length > 0) URUN_LIST = md.urunList;
-            if (Array.isArray(md.hatList) && md.hatList.length > 0) HAT_LIST = md.hatList;
-            if (Array.isArray(md.gozList) && md.gozList.length > 0) GOZ_LIST = md.gozList;
-            if (Array.isArray(md.personelList) && md.personelList.length > 0) PERSONEL_LIST = md.personelList;
-            if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = md.vardiyaList;
-            if (Array.isArray(md.turList) && md.turList.length > 0) TUR_LIST = md.turList;
-            if (Array.isArray(md.surecList) && md.surecList.length > 0) SUREC_LIST = md.surecList;
-            if (Array.isArray(md.uygunlukList) && md.uygunlukList.length > 0) UYGUNLUK_LIST = md.uygunlukList;
-            if (Array.isArray(md.bazList) && md.bazList.length > 0) BAZ_LIST = md.bazList;
-            if (Array.isArray(md.numuneSahibiList) && md.numuneSahibiList.length > 0) NUMUNE_SAHIBI_LIST = md.numuneSahibiList;
-            if (Array.isArray(md.urunTipiList) && md.urunTipiList.length > 0) URUN_TIPI_LIST = md.urunTipiList;
-            if (Array.isArray(md.firmaList) && md.firmaList.length > 0) FIRMA_LIST = md.firmaList;
+            if (Array.isArray(md.urunList) && md.urunList.length > 0) URUN_LIST = Array.from(new Set([...md.urunList, ...(URUN_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.hatList) && md.hatList.length > 0) HAT_LIST = Array.from(new Set([...md.hatList, ...(HAT_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.gozList) && md.gozList.length > 0) GOZ_LIST = Array.from(new Set([...md.gozList, ...(GOZ_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.personelList) && md.personelList.length > 0) PERSONEL_LIST = Array.from(new Set([...md.personelList, ...(PERSONEL_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.vardiyaList) && md.vardiyaList.length > 0) VARDIYA_LIST = Array.from(new Set([...md.vardiyaList, ...(VARDIYA_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.turList) && md.turList.length > 0) TUR_LIST = Array.from(new Set([...md.turList, ...(TUR_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.surecList) && md.surecList.length > 0) SUREC_LIST = Array.from(new Set([...md.surecList, ...(SUREC_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.uygunlukList) && md.uygunlukList.length > 0) UYGUNLUK_LIST = Array.from(new Set([...md.uygunlukList, ...(UYGUNLUK_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.bazList) && md.bazList.length > 0) BAZ_LIST = Array.from(new Set([...md.bazList, ...(BAZ_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.numuneSahibiList) && md.numuneSahibiList.length > 0) NUMUNE_SAHIBI_LIST = Array.from(new Set([...md.numuneSahibiList, ...(NUMUNE_SAHIBI_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.urunTipiList) && md.urunTipiList.length > 0) URUN_TIPI_LIST = Array.from(new Set([...md.urunTipiList, ...(URUN_TIPI_LIST || [])])).filter(Boolean);
+            if (Array.isArray(md.firmaList) && md.firmaList.length > 0) FIRMA_LIST = Array.from(new Set([...md.firmaList, ...(FIRMA_LIST || [])])).filter(Boolean);
             saveMasterDataToStorage();
           }
 
@@ -13540,8 +13596,12 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           }
 
           // 9. Zaman damgası ve revizyon eşitleme
-          localDatabaseRevision = remoteRev;
-          lastLocalMutationTime = remoteTs;
+          lastAppliedRemoteTimestamp = remoteTs;
+          lastAppliedRemoteRevision = remoteRev;
+          localDatabaseRevision = Math.max(localDatabaseRevision, remoteRev) + 1;
+          lastLocalMutationTime = Math.max(lastLocalMutationTime, remoteTs);
+          SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_TS", String(lastAppliedRemoteTimestamp));
+          SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_REV", String(lastAppliedRemoteRevision));
           SafeStorage.setItem("LAB_ERP_DB_REVISION", String(localDatabaseRevision));
           SafeStorage.setItem("LAB_ERP_LAST_ACTION_TS", String(lastLocalMutationTime));
 
@@ -13567,6 +13627,10 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             if (popoverEl && !popoverEl.classList.contains("hidden") && typeof openFieldConfigPopover === "function") {
               openFieldConfigPopover(currentPopoverFieldKey, null, null);
             }
+          }
+
+          if (hasLocalUnsyncedRecords) {
+            triggerCloudSyncImmediate("Yerel ve Uzak Kayıtları Birleştirme");
           }
           if (typeof applyTableFilters === "function") {
             applyTableFilters();
@@ -21230,7 +21294,8 @@ function openTableModifierModal(e) {
       }
       if (!confirm(`"${optionVal}" seçeneğini bu alandan çıkarmak istediğinize emin misiniz?`)) return;
 
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
+      const now = Date.now();
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       if (f && Array.isArray(f.options)) {
         const idx = f.options.indexOf(optionVal);
         if (idx !== -1) {
@@ -21245,6 +21310,7 @@ function openTableModifierModal(e) {
           delete f.optionColorsMap[optionVal.trim()];
           delete f.optionColorsMap[optionVal.trim().toUpperCase()];
         }
+        f.updatedAt = now;
       }
 
       if (window.CATEGORY_CUSTOM_COLORS) {
@@ -21271,18 +21337,34 @@ function openTableModifierModal(e) {
         PERSONEL_LIST = PERSONEL_LIST.filter(o => o !== optionVal);
       } else if (fieldKey === "urun" && Array.isArray(URUN_LIST)) {
         URUN_LIST = URUN_LIST.filter(o => o !== optionVal);
+      } else if (fieldKey === "numuneSahibi" && Array.isArray(NUMUNE_SAHIBI_LIST)) {
+        NUMUNE_SAHIBI_LIST = NUMUNE_SAHIBI_LIST.filter(o => o !== optionVal);
+      } else if (fieldKey === "urunTipi" && Array.isArray(URUN_TIPI_LIST)) {
+        URUN_TIPI_LIST = URUN_TIPI_LIST.filter(o => o !== optionVal);
+      } else if (fieldKey === "firma" && Array.isArray(FIRMA_LIST)) {
+        FIRMA_LIST = FIRMA_LIST.filter(o => o !== optionVal);
+      } else if (fieldKey === "baz" && Array.isArray(BAZ_LIST)) {
+        BAZ_LIST = BAZ_LIST.filter(o => o !== optionVal);
       }
 
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(fieldKey);
       refreshAllDropdowns();
       updateCustomFieldCategorySelects();
+
+      if (typeof renderPopoverCategoryOptions === "function") {
+        renderPopoverCategoryOptions(fieldKey);
+      }
 
       if (typeof attachLiveModifierBarsToFields === "function") {
         attachLiveModifierBarsToFields();
       }
       if (typeof updateSidebarCounts === "function") {
         updateSidebarCounts((typeof currentFilteredRecords !== "undefined" && currentFilteredRecords) ? currentFilteredRecords : (typeof labRecords !== "undefined" ? labRecords : []));
+      }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Açılır Liste Seçeneği Silindi: ${fieldKey} - ${optionVal}`);
       }
 
       if (typeof showToastNotification === "function") {
@@ -21293,12 +21375,13 @@ function openTableModifierModal(e) {
     // Kategori / Seçenek İsmini Güncelleme (Modifiye Ekranından Seçenek Yeniden Adlandırma)
     function promptEditCategoryOption(fieldKey, oldVal) {
       if (!oldVal) return;
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       const fieldName = f ? (f.label || f.headerLabel) : fieldKey;
 
       const newVal = prompt(`"${fieldName}" alanındaki "${oldVal}" seçeneği için yeni ismi giriniz:`, oldVal);
       if (!newVal || !newVal.trim() || newVal.trim() === oldVal) return;
       const cleanNew = newVal.trim();
+      const now = Date.now();
 
       // 1. templateFields içindeki options ve optionsColors güncelle
       if (f && Array.isArray(f.options)) {
@@ -21313,6 +21396,7 @@ function openTableModifierModal(e) {
             }
           }
         }
+        f.updatedAt = now;
       }
 
       // Renk haritasını güncelle
@@ -21358,6 +21442,18 @@ function openTableModifierModal(e) {
           delete PRODUCT_NITROGEN_SPECS[oldVal];
           saveProductNitrogenSpecsToStorage();
         }
+      } else if (fieldKey === "numuneSahibi" && typeof NUMUNE_SAHIBI_LIST !== "undefined") {
+        const i = NUMUNE_SAHIBI_LIST.indexOf(oldVal);
+        if (i !== -1) NUMUNE_SAHIBI_LIST[i] = cleanNew;
+      } else if (fieldKey === "urunTipi" && typeof URUN_TIPI_LIST !== "undefined") {
+        const i = URUN_TIPI_LIST.indexOf(oldVal);
+        if (i !== -1) URUN_TIPI_LIST[i] = cleanNew;
+      } else if (fieldKey === "firma" && typeof FIRMA_LIST !== "undefined") {
+        const i = FIRMA_LIST.indexOf(oldVal);
+        if (i !== -1) FIRMA_LIST[i] = cleanNew;
+      } else if (fieldKey === "baz" && typeof BAZ_LIST !== "undefined") {
+        const i = BAZ_LIST.indexOf(oldVal);
+        if (i !== -1) BAZ_LIST[i] = cleanNew;
       }
 
       // 3. Veritabanındaki mevcut kayıtlarda eski ismi yenisiyle güncelle
@@ -21390,9 +21486,13 @@ function openTableModifierModal(e) {
 
       // 4. Depolamayı kaydet ve UI'yı senkronize et
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(fieldKey);
       refreshAllDropdowns();
       updateCustomFieldCategorySelects();
+
+      if (typeof renderPopoverCategoryOptions === "function") {
+        renderPopoverCategoryOptions(fieldKey);
+      }
 
       if (typeof attachLiveModifierBarsToFields === "function" && typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         attachLiveModifierBarsToFields();
@@ -21403,6 +21503,10 @@ function openTableModifierModal(e) {
       }
       if (typeof updateSidebarCounts === "function") {
         updateSidebarCounts((typeof currentFilteredRecords !== "undefined" && currentFilteredRecords) ? currentFilteredRecords : labRecords);
+      }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Açılır Liste Seçeneği Düzenlendi: ${fieldKey} - ${cleanNew}`);
       }
 
       if (typeof showToastNotification === "function") {
@@ -21418,14 +21522,18 @@ function openTableModifierModal(e) {
     }
 
     function promptAddCategoryOption(fieldKey) {
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
-      const fieldName = f ? f.label : fieldKey;
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
+      const fieldName = f ? (f.label || f.headerLabel) : fieldKey;
       const val = prompt(`"${fieldName}" alanına eklemek istediğiniz yeni seçeneği girin:`);
       if (!val || !val.trim()) return;
       const clean = val.trim();
+      const now = Date.now();
 
       const curOptCount = (f && Array.isArray(f.options)) ? f.options.length : 0;
-      const assignedColor = PODIO_PALETTE_COLORS[curOptCount % PODIO_PALETTE_COLORS.length];
+      const assignedColor = (typeof PODIO_PALETTE_COLORS !== "undefined" && PODIO_PALETTE_COLORS.length > 0)
+        ? PODIO_PALETTE_COLORS[curOptCount % PODIO_PALETTE_COLORS.length]
+        : "#e0e7ff";
+
       if (f) {
         if (!Array.isArray(f.options)) f.options = [];
         if (!f.options.includes(clean)) {
@@ -21435,6 +21543,7 @@ function openTableModifierModal(e) {
           if (!f.optionColorsMap) f.optionColorsMap = {};
           f.optionColorsMap[clean] = assignedColor;
         }
+        f.updatedAt = now;
       }
       setCategoryOptionColor(fieldKey, clean, assignedColor);
 
@@ -21454,12 +21563,26 @@ function openTableModifierModal(e) {
         if (!PERSONEL_LIST.includes(clean)) PERSONEL_LIST.push(clean);
       } else if (fieldKey === "urun") {
         if (!URUN_LIST.includes(clean)) URUN_LIST.push(clean);
+      } else if (fieldKey === "numuneSahibi") {
+        if (!NUMUNE_SAHIBI_LIST.includes(clean)) NUMUNE_SAHIBI_LIST.push(clean);
+      } else if (fieldKey === "urunTipi") {
+        if (!URUN_TIPI_LIST.includes(clean)) URUN_TIPI_LIST.push(clean);
+      } else if (fieldKey === "firma") {
+        if (!FIRMA_LIST.includes(clean)) FIRMA_LIST.push(clean);
+      } else if (fieldKey === "baz") {
+        if (!BAZ_LIST.includes(clean)) BAZ_LIST.push(clean);
       }
 
+      syncMasterListsAndStorage();
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(fieldKey);
       refreshAllDropdowns();
       updateCustomFieldCategorySelects();
+
+      // Popover açık ise popover seçeneklerini derhal yenile
+      if (typeof renderPopoverCategoryOptions === "function") {
+        renderPopoverCategoryOptions(fieldKey);
+      }
 
       // İlgili seçim kutusunu anında yeni eklenen değere ayarla
       if (fieldKey === "tur") {
@@ -21480,6 +21603,15 @@ function openTableModifierModal(e) {
       } else if (fieldKey === "vardiya") {
         const el = document.getElementById("modalVardiya");
         if (el) el.value = clean;
+      } else if (fieldKey === "numuneSahibi") {
+        const el = document.getElementById("modalNumuneSahibi");
+        if (el) el.value = clean;
+      } else if (fieldKey === "urunTipi") {
+        const el = document.getElementById("modalUrunTipi");
+        if (el) el.value = clean;
+      } else if (fieldKey === "firma") {
+        const el = document.getElementById("modalFirma");
+        if (el) el.value = clean;
       } else if (fieldKey === "urun") {
         const el = document.getElementById("modalProduct");
         if (el) el.value = clean;
@@ -21490,6 +21622,10 @@ function openTableModifierModal(e) {
 
       if (typeof attachLiveModifierBarsToFields === "function") {
         attachLiveModifierBarsToFields();
+      }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Şablon Açılır Liste Seçeneği Eklendi: ${fieldKey} - ${clean}`);
       }
 
       if (typeof showToastNotification === "function") {
@@ -21617,8 +21753,9 @@ function openTableModifierModal(e) {
       const oldName = f.label;
       f.label = newName;
       f.headerLabel = newName;
+      f.updatedAt = Date.now();
 
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(fieldKey);
       syncAllColumnsFromTemplateFields();
       updateFormFieldLabelDOM(fieldKey, newName);
       renderTableHeaders();
@@ -21824,11 +21961,12 @@ function openTableModifierModal(e) {
 
       const oldCat = f.category;
       f.category = newCat;
+      f.updatedAt = Date.now();
 
       const badge = document.getElementById("popover_cat_badge");
       if (badge) badge.innerText = newCat;
 
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(f.key);
 
       // Form içerisindeki bölümünü senkronize et
       moveFieldContainerToCategorySection(f.key, newCat);
@@ -28756,20 +28894,12 @@ async function initializeLabErpApp() {
         return `<td class="py-1 px-1 border-r border-slate-200 text-center ${colClass}"><span class="font-semibold text-slate-300 text-xs block text-center">-</span></td>`;
       } else if (k === "nem") {
         const nemDec = getFieldDecimals("nem");
-        const nemStep = nemDec === 0 ? "1" : ("0." + "0".repeat(Math.max(0, nemDec - 1)) + "1");
         const rawNem = (row.nem !== undefined && row.nem !== null && row.nem !== "") ? row.nem : (row.entered_yas?.nem ?? null);
         const nemNum = rawNem !== null ? parseTRNumber(rawNem) : null;
-        const nemVal = (nemNum !== null && !isNaN(nemNum) && nemNum > 0) ? (nemNum.toFixed(nemDec)) : "";
-        if (!canEdit) {
-          return `
-            <td class="py-1 px-1 border-r border-slate-200 text-center font-semibold text-slate-800 text-xs ${colClass}">
-              ${nemVal !== "" ? `%${formatTRNumber(nemNum, nemDec)}` : '<span class="text-slate-300 font-normal">-</span>'}
-            </td>
-          `;
-        }
+        const nemVal = (nemNum !== null && !isNaN(nemNum)) ? formatTRNumber(nemNum, nemDec) : "";
         return `
-          <td class="py-1 px-1 border-r border-slate-200 text-center ${colClass}">
-            <input type="number" step="${nemStep}" value="${nemVal}" onchange="onTableRowNemEdit('${row.id}', this.value)" class="grid-cell-input w-full text-center p-1 rounded text-slate-800 font-semibold bg-transparent text-xs" placeholder="-">
+          <td class="py-1 px-1 border-r border-slate-200 text-center font-semibold text-slate-800 text-xs select-none bg-slate-50/30 ${colClass}" title="Nem değeri tablodan düzenlenemez">
+            ${nemVal !== "" ? `%${nemVal}` : '<span class="text-slate-300 font-normal">-</span>'}
           </td>
         `;
       } else if (k === "km") {
@@ -29373,15 +29503,9 @@ async function initializeLabErpApp() {
     }
 
     function onTableRowNemEdit(id, newNem) {
-      if (!hasPermission("canEditRecord")) {
-        if (typeof showToastNotification === "function") showToastNotification("Düzenleme yetkiniz bulunmamaktadır. Salt Okunur modundasınız.");
-        return;
+      if (typeof showToastNotification === "function") {
+        showToastNotification("Nem değeri tablodan doğrudan değiştirilemez. Lütfen kaydı düzenleme ekranını kullanınız.");
       }
-      const rec = labRecords.find(r => r.id === id);
-      if (!rec) return;
-      rec.nem = parseFloat(newNem) || 0;
-      saveLabRecordsToStorage();
-      applyTableFilters();
     }
 
     function onTableTurChange(id, newTur, selectEl) {
@@ -36382,22 +36506,24 @@ function closeModal() {
           };
           Object.keys(syncMap).forEach(key => {
             const tf = templateFields.find(f => f.key === key);
-            if (tf && Array.isArray(tf.options) && tf.options.length > 0) {
-              // tf.options şablondaki güncel sıralamayı tutar; master listeleri de bu sıralamayla güncelle
-              if (key === "baz") BAZ_LIST = [...tf.options];
-              else if (key === "tur") TUR_LIST = [...tf.options];
-              else if (key === "surec") SUREC_LIST = [...tf.options];
-              else if (key === "uygunluk") UYGUNLUK_LIST = [...tf.options];
-              else if (key === "hat") HAT_LIST = [...tf.options];
-              else if (key === "goz") GOZ_LIST = [...tf.options];
-              else if (key === "vardiya") VARDIYA_LIST = [...tf.options];
-              else if (key === "personel") PERSONEL_LIST = [...tf.options];
-              else if (key === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...tf.options];
-              else if (key === "urunTipi") URUN_TIPI_LIST = [...tf.options];
-              else if (key === "firma") FIRMA_LIST = [...tf.options];
-              else if (key === "urun") URUN_LIST = [...tf.options];
-            } else if (tf && Array.isArray(syncMap[key]) && syncMap[key].length > 0) {
-              tf.options = [...syncMap[key]];
+            if (tf) {
+              if (!Array.isArray(tf.options)) tf.options = [];
+              const currentList = Array.isArray(syncMap[key]) ? syncMap[key] : [];
+              // Her iki kaynağı birleştir: tf.options öncelikli sıralama, master listelerdeki yeni öğeler de listenin sonuna eklenir
+              const merged = Array.from(new Set([...tf.options, ...currentList])).filter(Boolean);
+              tf.options = [...merged];
+              if (key === "baz") BAZ_LIST = [...merged];
+              else if (key === "tur") TUR_LIST = [...merged];
+              else if (key === "surec") SUREC_LIST = [...merged];
+              else if (key === "uygunluk") UYGUNLUK_LIST = [...merged];
+              else if (key === "hat") HAT_LIST = [...merged];
+              else if (key === "goz") GOZ_LIST = [...merged];
+              else if (key === "vardiya") VARDIYA_LIST = [...merged];
+              else if (key === "personel") PERSONEL_LIST = [...merged];
+              else if (key === "numuneSahibi") NUMUNE_SAHIBI_LIST = [...merged];
+              else if (key === "urunTipi") URUN_TIPI_LIST = [...merged];
+              else if (key === "firma") FIRMA_LIST = [...merged];
+              else if (key === "urun") URUN_LIST = [...merged];
             }
           });
         }
@@ -36966,6 +37092,10 @@ function closeModal() {
       else if (activeMasterTab === "vardiya") targetList = VARDIYA_LIST;
       else if (activeMasterTab === "surec") targetList = SUREC_LIST;
       else if (activeMasterTab === "uygunluk") targetList = UYGUNLUK_LIST;
+      else if (activeMasterTab === "numuneSahibi") targetList = NUMUNE_SAHIBI_LIST;
+      else if (activeMasterTab === "urunTipi") targetList = URUN_TIPI_LIST;
+      else if (activeMasterTab === "firma") targetList = FIRMA_LIST;
+      else if (activeMasterTab === "baz") targetList = BAZ_LIST;
 
       if (!targetList) return;
 
@@ -36975,7 +37105,17 @@ function closeModal() {
       }
 
       targetList.push(val);
+      const now = Date.now();
+      const f = (templateFields || []).find(tf => tf.key === activeMasterTab);
+      if (f) {
+        if (!Array.isArray(f.options)) f.options = [];
+        if (!f.options.includes(val)) f.options.push(val);
+        f.updatedAt = now;
+      }
+
       syncMasterListsAndStorage();
+      saveMasterDataToStorage();
+      saveTemplateFieldsToStorage(activeMasterTab);
       refreshAllDropdowns();
       applyTableFilters();
       renderMasterItemList(activeMasterTab);
@@ -36990,6 +37130,14 @@ function closeModal() {
       const cS = document.getElementById("count_tab_surec"); if (cS) cS.innerText = SUREC_LIST.length;
       const cUyg = document.getElementById("count_tab_uygunluk"); if (cUyg) cUyg.innerText = UYGUNLUK_LIST.length;
 
+      if (typeof renderPopoverCategoryOptions === "function" && typeof currentPopoverFieldKey !== "undefined" && currentPopoverFieldKey === activeMasterTab) {
+        renderPopoverCategoryOptions(activeMasterTab);
+      }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Tanımlamalar Öğesi Eklendi: ${activeMasterTab} - ${val}`);
+      }
+
       showToastNotification(`"${val}" başarıyla eklendi.`);
     }
 
@@ -37000,6 +37148,7 @@ function closeModal() {
       }
       if (!confirm(`"${item}" öğesini listeden silmek istediğinize emin misiniz?`)) return;
 
+      const now = Date.now();
       if (type === "urun") URUN_LIST = URUN_LIST.filter(x => x !== item);
       else if (type === "tur") TUR_LIST = TUR_LIST.filter(x => x !== item);
       else if (type === "goz") GOZ_LIST = GOZ_LIST.filter(x => x !== item);
@@ -37008,6 +37157,10 @@ function closeModal() {
       else if (type === "vardiya") VARDIYA_LIST = VARDIYA_LIST.filter(x => x !== item);
       else if (type === "surec") SUREC_LIST = SUREC_LIST.filter(x => x !== item);
       else if (type === "uygunluk") UYGUNLUK_LIST = UYGUNLUK_LIST.filter(x => x !== item);
+      else if (type === "numuneSahibi") NUMUNE_SAHIBI_LIST = NUMUNE_SAHIBI_LIST.filter(x => x !== item);
+      else if (type === "urunTipi") URUN_TIPI_LIST = URUN_TIPI_LIST.filter(x => x !== item);
+      else if (type === "firma") FIRMA_LIST = FIRMA_LIST.filter(x => x !== item);
+      else if (type === "baz") BAZ_LIST = BAZ_LIST.filter(x => x !== item);
 
       // templateFields içindeki seçenekleri ve renkleri de eksiksiz temizle (Renk kaymasını ve dirilmeyi önle)
       const f = (templateFields || []).find(tf => tf.key === type);
@@ -37023,13 +37176,14 @@ function closeModal() {
           delete f.optionColorsMap[item];
           delete f.optionColorsMap[item.trim()];
         }
+        f.updatedAt = now;
       }
       if (window.CATEGORY_CUSTOM_COLORS) {
         delete window.CATEGORY_CUSTOM_COLORS[`${type}___${item.trim().toUpperCase()}`];
       }
 
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(type);
       refreshAllDropdowns();
       renderMasterItemList(type);
 
@@ -37041,6 +37195,14 @@ function closeModal() {
       const cV = document.getElementById("count_tab_vardiya"); if (cV) cV.innerText = VARDIYA_LIST.length;
       const cS = document.getElementById("count_tab_surec"); if (cS) cS.innerText = SUREC_LIST.length;
       const cUyg = document.getElementById("count_tab_uygunluk"); if (cUyg) cUyg.innerText = UYGUNLUK_LIST.length;
+
+      if (typeof renderPopoverCategoryOptions === "function" && typeof currentPopoverFieldKey !== "undefined" && currentPopoverFieldKey === type) {
+        renderPopoverCategoryOptions(type);
+      }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Tanımlamalar Öğesi Silindi: ${type} - ${item}`);
+      }
 
       showToastNotification(`"${item}" listeden silindi.`);
     }
@@ -37061,7 +37223,8 @@ function closeModal() {
         firma: "Yeni Firma",
         vardiya: "Yeni Vardiya",
         surec: "Yeni Süreç Durumu",
-        uygunluk: "Yeni Kalite Durumu"
+        uygunluk: "Yeni Kalite Durumu",
+        baz: "Yeni Baz Seçeneği"
       };
 
       const title = typeTitles[type] || "Yeni Öğe";
@@ -37081,6 +37244,7 @@ function closeModal() {
       else if (type === "vardiya") targetList = VARDIYA_LIST;
       else if (type === "surec") targetList = SUREC_LIST;
       else if (type === "uygunluk") targetList = UYGUNLUK_LIST;
+      else if (type === "baz") targetList = BAZ_LIST;
 
       if (!targetList) return;
 
@@ -37088,10 +37252,45 @@ function closeModal() {
         targetList.push(cleanVal);
       }
 
-      // Merkezi senkronizasyon
-      syncMasterListsAndStorage();
-      refreshAllDropdowns();
+      // 1. templateFields içinde de aynı alanı bulup seçeneklerine ekle
+      const now = Date.now();
+      const f = (templateFields || []).find(tf => tf.key === type);
+      if (f) {
+        if (!Array.isArray(f.options)) f.options = [];
+        if (!f.options.includes(cleanVal)) {
+          f.options.push(cleanVal);
+        }
+        const curOptCount = f.options.length;
+        const assignedColor = (typeof PODIO_PALETTE_COLORS !== "undefined" && PODIO_PALETTE_COLORS.length > 0)
+          ? PODIO_PALETTE_COLORS[(curOptCount - 1) % PODIO_PALETTE_COLORS.length]
+          : "#e0e7ff";
+        if (!Array.isArray(f.optionsColors)) f.optionsColors = [];
+        if (f.optionsColors.length < f.options.length) {
+          f.optionsColors.push(assignedColor);
+        }
+        if (!f.optionColorsMap) f.optionColorsMap = {};
+        if (!f.optionColorsMap[cleanVal]) {
+          f.optionColorsMap[cleanVal] = assignedColor;
+        }
+        f.updatedAt = now;
+        if (typeof setCategoryOptionColor === "function") {
+          setCategoryOptionColor(type, cleanVal, assignedColor);
+        }
+      }
 
+      // 2. Merkezi liste ve şablon senkronizasyonu
+      syncMasterListsAndStorage();
+      saveMasterDataToStorage();
+      saveTemplateFieldsToStorage(type);
+      refreshAllDropdowns();
+      updateCustomFieldCategorySelects();
+
+      // 3. Popover açık ise popover seçeneklerini derhal yenile
+      if (typeof renderPopoverCategoryOptions === "function") {
+        renderPopoverCategoryOptions(type);
+      }
+
+      // 4. Modal içindeki ilgili alanı hemen yeni eklenen değere ayarla
       if (type === "tur") {
         const el = document.getElementById("modalTur");
         if (el) el.value = cleanVal;
@@ -37104,6 +37303,12 @@ function closeModal() {
       } else if (type === "hat") {
         const el = document.getElementById("modalHat");
         if (el) el.value = cleanVal;
+      } else if (type === "goz") {
+        const el = document.getElementById("modalGoz");
+        if (el) el.value = cleanVal;
+      } else if (type === "vardiya") {
+        const el = document.getElementById("modalVardiya");
+        if (el) el.value = cleanVal;
       } else if (type === "numuneSahibi") {
         const el = document.getElementById("modalNumuneSahibi");
         if (el) el.value = cleanVal;
@@ -37113,61 +37318,18 @@ function closeModal() {
       } else if (type === "firma") {
         const el = document.getElementById("modalFirma");
         if (el) el.value = cleanVal;
-      } else if (type === "goz") {
-        const el = document.getElementById("modalGoz");
-        if (el) el.value = cleanVal;
-      } else if (type === "vardiya") {
-        const el = document.getElementById("modalVardiya");
-        if (el) el.value = cleanVal;
-      }
-
-      // Modal içindeki ilgili alanı hemen yeni eklenen değere ayarla
-      if (type === "urun") {
-        const el = document.getElementById("modalProduct");
-        if (el) {
-          // Güvence: seçenek henüz DOM'da yoksa bile anında ekle
-          if (!Array.from(el.options).some(o => o.value === cleanVal)) {
-            const opt = document.createElement("option");
-            opt.value = cleanVal;
-            opt.text = cleanVal;
-            el.appendChild(opt);
-          }
-          el.value = cleanVal;
-          onModalProductChange();
+        const firmaDl = document.getElementById("firmaDatalist");
+        if (firmaDl && Array.isArray(FIRMA_LIST)) {
+          firmaDl.innerHTML = FIRMA_LIST.map(f => `<option value="${escapeHtml(f)}">`).join("");
         }
-      } else if (type === "numuneSahibi") {
-        const el = document.getElementById("modalNumuneSahibi");
-        if (el) el.value = cleanVal;
-      } else if (type === "urunTipi") {
-        const el = document.getElementById("modalUrunTipi");
-        if (el) el.value = cleanVal;
-      } else if (type === "firma") {
-        const el = document.getElementById("modalFirma");
-        if (el) el.value = cleanVal;
-      } else if (type === "goz") {
-        const el = document.getElementById("modalGoz");
-        if (el) el.value = cleanVal;
-      } else if (type === "hat") {
-        const el = document.getElementById("modalHat");
-        if (el) el.value = cleanVal;
-      } else if (type === "vardiya") {
-        const el = document.getElementById("modalVardiya");
-        if (el) el.value = cleanVal;
       } else if (type === "personel") {
         buildPersonelCheckboxes();
-      setOpts("modalNumuneSahibi", NUMUNE_SAHIBI_LIST);
-      setOpts("modalUrunTipi", URUN_TIPI_LIST);
-      const firmaDl = document.getElementById("firmaDatalist");
-      if (firmaDl && Array.isArray(FIRMA_LIST)) {
-        firmaDl.innerHTML = FIRMA_LIST.map(f => `<option value="${escapeHtml(f)}">`).join("");
-      }
         document.querySelectorAll(".personel-cb").forEach(cb => {
           if (cb.value === cleanVal) cb.checked = true;
         });
       }
 
       applyTableFilters();
-      saveTemplateFieldsToStorage();
       if (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         if (typeof attachLiveModifierBarsToFields === "function") {
           attachLiveModifierBarsToFields();
@@ -37176,6 +37338,11 @@ function closeModal() {
           setupCategoryOptionsDragAndDrop();
         }
       }
+
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Açılır Liste Seçeneği Eklendi: ${type} - ${cleanVal}`);
+      }
+
       showToastNotification(`"${cleanVal}" başarıyla eklendi, kalıcı olarak kaydedildi ve seçildi.`);
     }
 
@@ -37388,7 +37555,7 @@ function closeModal() {
             templateFields.forEach(tf => {
               const df = DEFAULT_TEMPLATE_FIELDS.find(d => d.key === tf.key);
               if (df) {
-                tf.category = df.category;
+                if (!tf.category) tf.category = df.category;
                 if (df.group) tf.group = df.group;
                 if (df.subType) tf.subType = df.subType;
                 if (!tf.options || !Array.isArray(tf.options) || tf.options.length === 0) {
@@ -37519,11 +37686,13 @@ function closeModal() {
     function saveTemplateFieldsToStorage(modifiedKey = null) {
       try {
         const now = Date.now();
-        // Eğer belirli bir alan veya tüm alanlar değiştirildiyse zaman damgasını güncelle
         if (Array.isArray(templateFields)) {
           templateFields.forEach(tf => {
-            if (!tf.updatedAt) tf.updatedAt = now;
-            if (modifiedKey && tf.key === modifiedKey) {
+            if (!tf.updatedAt) {
+              tf.updatedAt = now;
+            } else if (modifiedKey === true) {
+              tf.updatedAt = now;
+            } else if (modifiedKey && typeof modifiedKey === "string" && tf.key === modifiedKey) {
               tf.updatedAt = now;
             }
           });
@@ -37532,7 +37701,7 @@ function closeModal() {
         if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
             typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
           if (typeof markLocalDatabaseModified === "function") {
-            markLocalDatabaseModified(modifiedKey ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
+            markLocalDatabaseModified(modifiedKey && typeof modifiedKey === "string" ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
           }
         }
       } catch (e) {
@@ -37835,6 +38004,7 @@ function closeModal() {
           }
         }
         if (f) {
+          f.updatedAt = Date.now();
           if (!f.optionColorsMap) f.optionColorsMap = {};
           f.optionColorsMap[cleanVal] = newColor;
           f.optionColorsMap[upperVal] = newColor;
@@ -37847,7 +38017,7 @@ function closeModal() {
             f.optionsColors[optIdx] = newColor;
           }
         }
-        saveTemplateFieldsToStorage();
+        saveTemplateFieldsToStorage(fieldKey);
       }
 
       // 3. Tabloyu ve dropdownları anında canlı güncelle
@@ -37856,6 +38026,9 @@ function closeModal() {
       }
       if (typeof refreshAllDropdowns === "function") refreshAllDropdowns();
       if (typeof updateCustomFieldCategorySelects === "function") updateCustomFieldCategorySelects();
+      if (typeof renderPopoverCategoryOptions === "function" && typeof currentPopoverFieldKey !== "undefined" && currentPopoverFieldKey === fieldKey) {
+        renderPopoverCategoryOptions(fieldKey);
+      }
     }
 
     // ========================================================
@@ -39137,17 +39310,22 @@ function saveMasterTemplate() {
     }
 
         function quickAddCustomCategoryOption(fieldKey) {
-      const f = (templateFields || []).find(tf => tf.key === fieldKey);
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
       if (!f) return;
       const val = prompt(`"${f.label}" alanına eklemek istediğiniz yeni seçeneği girin:`);
       if (!val || !val.trim()) return;
       const clean = val.trim();
+      const now = Date.now();
       if (!Array.isArray(f.options)) f.options = [];
       if (!f.options.includes(clean)) f.options.push(clean);
-      saveTemplateFieldsToStorage();
+      f.updatedAt = now;
+      saveTemplateFieldsToStorage(fieldKey);
       renderCustomFieldsInEntryModal();
       const el = document.getElementById(`m_cf_${f.key}`);
       if (el) el.value = clean;
+      if (typeof renderPopoverCategoryOptions === "function" && typeof currentPopoverFieldKey !== "undefined" && currentPopoverFieldKey === fieldKey) {
+        renderPopoverCategoryOptions(fieldKey);
+      }
       if (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         if (typeof attachLiveModifierBarsToFields === "function") {
           attachLiveModifierBarsToFields();
@@ -39155,6 +39333,9 @@ function saveMasterTemplate() {
         if (typeof setupCategoryOptionsDragAndDrop === "function") {
           setupCategoryOptionsDragAndDrop();
         }
+      }
+      if (typeof markLocalDatabaseModified === "function") {
+        markLocalDatabaseModified(`Özel Kategori Seçeneği Eklendi: ${fieldKey} - ${clean}`);
       }
       if (typeof showToastNotification === "function") {
         showToastNotification(`"${clean}" seçeneği "${f.label}" alanına eklendi ve seçildi.`);
@@ -39385,6 +39566,45 @@ function renderCustomFieldsInEntryModal() {
       statusText.className = isAlwaysHidden ? "text-rose-600 font-bold" : (isReq ? "text-amber-600 font-bold" : "text-slate-600 font-medium");
     }
 
+    function renderPopoverCategoryOptions(fieldKey) {
+      if (!fieldKey) return;
+      const catBox = document.getElementById("popover_category_options_box");
+      const catChips = document.getElementById("popover_category_chips");
+      const catCount = document.getElementById("popover_cat_count");
+      if (!catBox || !catChips) return;
+
+      const f = (templateFields || []).find(tf => tf.key === fieldKey || tf.id === fieldKey) || (DEFAULT_TEMPLATE_FIELDS || []).find(tf => tf.key === fieldKey || tf.id === fieldKey);
+      const isCat = (fieldKey === "personel" || fieldKey === "tur" || fieldKey === "hat" || fieldKey === "goz" || fieldKey === "vardiya" || fieldKey === "numuneSahibi" || fieldKey === "urunTipi" || fieldKey === "surec" || fieldKey === "uygunluk" || fieldKey === "firma" || fieldKey === "baz" || (f && (f.type === "category" || f.type === "member")));
+
+      if (isCat) {
+        catBox.classList.remove("hidden");
+        const opts = getCategoryFieldOptions(fieldKey) || (f ? f.options : []) || [];
+        if (catCount) catCount.innerText = opts.length;
+        catChips.innerHTML = opts.map(opt => {
+          const optColor = getCategoryOptionColor(fieldKey, opt) || "#e0e7ff";
+          const safeOpt = String(opt).replace(/'/g, "\\'");
+          return `
+            <div class="flex items-center justify-between p-1.5 rounded bg-white border border-slate-200 shadow-2xs">
+              <div class="flex items-center space-x-1.5 min-w-0 mr-1">
+                <button type="button" onclick="openCategoryColorPickerPopover('${fieldKey}', '${safeOpt}', this)" class="cat-color-picker-btn w-4 h-4 rounded-full shrink-0 border border-black/15 shadow-2xs hover:scale-125 transition cursor-pointer" style="background-color: ${optColor};" title="Rengi Değiştir (${optColor})"></button>
+                <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(opt)}</span>
+              </div>
+              <div class="flex items-center space-x-1 shrink-0">
+                <button type="button" onclick="promptEditCategoryOption('${fieldKey}', '${safeOpt}')" class="p-1 text-slate-500 hover:text-indigo-600 rounded hover:bg-slate-100 transition" title="İsmi Değiştir">
+                  <i class="fa-solid fa-pen text-[9.5px]"></i>
+                </button>
+                <button type="button" onclick="removeCategoryOption('${fieldKey}', '${safeOpt}')" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100 transition" title="Seçeneği Sil">
+                  <i class="fa-solid fa-trash text-[9.5px]"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } else {
+        catBox.classList.add("hidden");
+      }
+    }
+
     function openFieldConfigPopover(fieldKey, fieldTitle, e) {
       if (e) {
         e.stopPropagation();
@@ -39443,40 +39663,7 @@ function renderCustomFieldsInEntryModal() {
       if (f) updatePopoverStatusDisplay(f);
 
       // Açılır liste alanı kontrolü ve seçeneklerini listele
-      const catBox = document.getElementById("popover_category_options_box");
-      const catChips = document.getElementById("popover_category_chips");
-      const catCount = document.getElementById("popover_cat_count");
-      if (catBox && catChips) {
-        const isCat = (fieldKey === "personel" || fieldKey === "tur" || fieldKey === "hat" || fieldKey === "goz" || fieldKey === "vardiya" || fieldKey === "numuneSahibi" || fieldKey === "urunTipi" || fieldKey === "surec" || fieldKey === "uygunluk" || (f && (f.type === "category" || f.type === "member")));
-        if (isCat) {
-          catBox.classList.remove("hidden");
-          const opts = getCategoryFieldOptions(fieldKey) || (f ? f.options : []) || [];
-          if (catCount) catCount.innerText = opts.length;
-          catChips.innerHTML = opts.map(opt => {
-            const optColor = getCategoryOptionColor(fieldKey, opt) || "#e0e7ff";
-            const optFg = getContrastTextColor(optColor);
-            const safeOpt = String(opt).replace(/'/g, "\\'");
-            return `
-              <div class="flex items-center justify-between p-1.5 rounded bg-white border border-slate-200 shadow-2xs">
-                <div class="flex items-center space-x-1.5 min-w-0 mr-1">
-                  <button type="button" onclick="openCategoryColorPickerPopover('${fieldKey}', '${safeOpt}', this)" class="cat-color-picker-btn w-4 h-4 rounded-full shrink-0 border border-black/15 shadow-2xs hover:scale-125 transition cursor-pointer" style="background-color: ${optColor};" title="Rengi Değiştir (${optColor})"></button>
-                  <span class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(opt)}</span>
-                </div>
-                <div class="flex items-center space-x-1 shrink-0">
-                  <button type="button" onclick="promptEditCategoryOption('${fieldKey}', '${safeOpt}')" class="p-1 text-slate-500 hover:text-indigo-600 rounded hover:bg-slate-100 transition" title="İsmi Değiştir">
-                    <i class="fa-solid fa-pen text-[9.5px]"></i>
-                  </button>
-                  <button type="button" onclick="removeCategoryOption('${fieldKey}', '${safeOpt}')" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-slate-100 transition" title="Seçeneği Sil">
-                    <i class="fa-solid fa-trash text-[9.5px]"></i>
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join("");
-        } else {
-          catBox.classList.add("hidden");
-        }
-      }
+      renderPopoverCategoryOptions(fieldKey);
 
       // Varsa ipucu ve varsayılan değeri getir
       const meta = fieldMetaConfig[fieldKey] || {};
@@ -39528,16 +39715,19 @@ function renderCustomFieldsInEntryModal() {
       if (!currentPopoverFieldKey) return;
       requiredFieldsConfig = requiredFieldsConfig || {};
       requiredFieldsConfig[currentPopoverFieldKey] = isChecked;
+      const now = Date.now();
 
       const f = (templateFields || []).find(tf => tf.key === currentPopoverFieldKey || tf.id === currentPopoverFieldKey);
       if (f) {
         f.required = isChecked;
+        f.updatedAt = now;
         updatePopoverStatusDisplay(f);
       }
 
       const cf = Array.isArray(customFields) ? customFields.find(x => x.key === currentPopoverFieldKey) : null;
       if (cf) {
         cf.required = isChecked;
+        cf.updatedAt = now;
         saveCustomFieldsToStorage();
       }
 
@@ -39546,7 +39736,7 @@ function renderCustomFieldsInEntryModal() {
       }
 
       saveMasterDataToStorage();
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(currentPopoverFieldKey);
       updateRequiredStars();
 
       if (liveFormModifierMode && typeof attachLiveModifierBarsToFields === "function") {
@@ -39560,14 +39750,16 @@ function renderCustomFieldsInEntryModal() {
     function toggleFieldReadOnlyFromPopover(isChecked) {
       if (!currentPopoverFieldKey) return;
       const targetKeys = (currentPopoverFieldKey === "numuneId" || currentPopoverFieldKey === "id") ? ["numuneId", "id"] : [currentPopoverFieldKey];
+      const now = Date.now();
 
       targetKeys.forEach(k => {
         const f = (templateFields || []).find(tf => tf.key === k || tf.id === k);
         if (f) {
           f.readOnly = isChecked;
+          f.updatedAt = now;
         }
       });
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(currentPopoverFieldKey);
 
       // Formda ve şablonda derhal uygula
       applyMasterTemplate();
@@ -39585,15 +39777,17 @@ function renderCustomFieldsInEntryModal() {
     function toggleFieldAlwaysHiddenFromPopover(isChecked) {
       if (!currentPopoverFieldKey) return;
       const targetKeys = (currentPopoverFieldKey === "numuneId" || currentPopoverFieldKey === "id") ? ["numuneId", "id"] : [currentPopoverFieldKey];
+      const now = Date.now();
 
       targetKeys.forEach(k => {
         const f = (templateFields || []).find(tf => tf.key === k || tf.id === k);
         if (f) {
           f.alwaysHidden = isChecked;
           f.enabled = !isChecked;
+          f.updatedAt = now;
         }
       });
-      saveTemplateFieldsToStorage();
+      saveTemplateFieldsToStorage(currentPopoverFieldKey);
 
       // Form alanını göster/gizle
       targetKeys.forEach(k => {
@@ -39631,7 +39825,8 @@ function renderCustomFieldsInEntryModal() {
       if (!f) return;
 
       f.hideIfEmpty = isChecked;
-      saveTemplateFieldsToStorage();
+      f.updatedAt = Date.now();
+      saveTemplateFieldsToStorage(currentPopoverFieldKey);
 
       // Şablon kurallarını uygula
       applyMasterTemplate();
