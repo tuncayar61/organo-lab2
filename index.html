@@ -13070,6 +13070,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         templateFields: templateFields || [],
         templateSectionOrder: (typeof getSavedTemplateSectionOrder === "function" ? getSavedTemplateSectionOrder() : JSON.parse(SafeStorage.getItem("LAB_ERP_TEMPLATE_SECTION_ORDER") || "[]")),
         templateSectionOrderTs: parseInt(SafeStorage.getItem("LAB_ERP_SECTION_ORDER_TS") || "0", 10),
+        fieldColSpans: (typeof getSavedFieldColSpans === "function" ? getSavedFieldColSpans() : JSON.parse(SafeStorage.getItem("LAB_ERP_FIELD_COL_SPANS") || "{}")),
+        fieldColSpansTs: parseInt(SafeStorage.getItem("LAB_ERP_FIELD_COL_SPANS_TS") || "0", 10),
         customCategories: (typeof getSavedCustomCategories === "function" ? getSavedCustomCategories() : JSON.parse(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES") || "[]")),
         customCategoriesTs: parseInt(SafeStorage.getItem("LAB_ERP_CUSTOM_CATEGORIES_TS") || "0", 10),
         removedCategories: (typeof getSavedRemovedCategories === "function" ? getSavedRemovedCategories() : JSON.parse(SafeStorage.getItem("LAB_ERP_REMOVED_CATEGORIES") || "[]")),
@@ -13408,6 +13410,41 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
               }
             });
             saveMasterDataToStorage();
+          }
+
+          // 7.0. KULLANICI KURALI: ALAN EBATLARI (COLSPAN) ALAN BAZLI AKILLI SENKRONİZASYON
+          if (db.fieldColSpans && typeof db.fieldColSpans === "object") {
+            const localSpans = getSavedFieldColSpans();
+            let spansChanged = false;
+
+            Object.keys(db.fieldColSpans).forEach(fKey => {
+              const remoteItem = db.fieldColSpans[fKey];
+              const localItem = localSpans[fKey];
+
+              const remoteSpanVal = (typeof remoteItem === "object" && remoteItem !== null) ? remoteItem.span : remoteItem;
+              const remoteSpanTs = (typeof remoteItem === "object" && remoteItem !== null && remoteItem.updatedAt) ? remoteItem.updatedAt : (db.fieldColSpansTs || remoteTs || 0);
+
+              const localSpanTs = (typeof localItem === "object" && localItem !== null && localItem.updatedAt) ? localItem.updatedAt : 0;
+
+              if (!localItem || remoteSpanTs >= localSpanTs || isUserInitiated) {
+                localSpans[fKey] = {
+                  span: Math.max(1, Math.min(4, parseInt(remoteSpanVal, 10) || 1)),
+                  updatedAt: remoteSpanTs
+                };
+                spansChanged = true;
+
+                // templateFields içindeki colSpan'ı da derhal senkronize et
+                const tf = (templateFields || []).find(t => t.key === fKey);
+                if (tf) tf.colSpan = Math.max(1, Math.min(4, parseInt(remoteSpanVal, 10) || 1));
+              }
+            });
+
+            if (spansChanged) {
+              SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS", JSON.stringify(localSpans));
+              SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS_TS", String(Date.now()));
+              SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+              applyAllFieldColSpans();
+            }
           }
 
           // 7.1. KULLANICI KURALI: KATEGORİ VE KATEGORİ SIRALAMASI SENKRONİZASYONU
@@ -20765,6 +20802,7 @@ function openTableModifierModal(e) {
 
       renderModifierHiddenFieldsList();
       renderCustomFieldsInEntryModal();
+      applyAllFieldColSpans();
       attachLiveModifierBarsToFields();
 
       if (modalBodyEl) modalBodyEl.scrollTop = 0;
@@ -21629,9 +21667,44 @@ function openTableModifierModal(e) {
     // ========================================================
     // ALAN EBATLARI (GENİŞLİK 1/4, 2/4, 3/4, 4/4) VE YERLEŞİM YÖNETİMİ
     // ========================================================
+    function getSavedFieldColSpans() {
+      try {
+        const raw = SafeStorage.getItem("LAB_ERP_FIELD_COL_SPANS");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") return parsed;
+        }
+      } catch(e) {}
+      return {};
+    }
+
+    function saveFieldColSpansMapToStorage(colSpansMap, actionDesc = "Alan Boyutu Güncellemesi") {
+      try {
+        SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS", JSON.stringify(colSpansMap));
+        SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS_TS", String(Date.now()));
+        if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          if (typeof markLocalDatabaseModified === "function") {
+            markLocalDatabaseModified(actionDesc);
+          }
+        }
+      } catch(e) {}
+    }
+
     function getFieldColSpan(fieldKey) {
+      // 1. Öncelik: Kalıcı ebat tablosu (SafeStorage LAB_ERP_FIELD_COL_SPANS)
+      const spansMap = getSavedFieldColSpans();
+      if (spansMap[fieldKey] !== undefined) {
+        const val = typeof spansMap[fieldKey] === "object" ? spansMap[fieldKey].span : spansMap[fieldKey];
+        const num = parseInt(val, 10);
+        if (num >= 1 && num <= 4) return num;
+      }
+
+      // 2. Öncelik: templateFields içerisindeki colSpan
       const f = (templateFields || []).find(tf => tf.key === fieldKey);
-      if (f && f.colSpan) return Math.max(1, Math.min(4, parseInt(f.colSpan) || 1));
+      if (f && f.colSpan) return Math.max(1, Math.min(4, parseInt(f.colSpan, 10) || 1));
+
+      // 3. Varsayılanlar
       if (fieldKey === "personel") return 3;
       if (fieldKey === "topAzot") return 3;
       if (fieldKey === "uygunluk") return 2;
@@ -21640,14 +21713,29 @@ function openTableModifierModal(e) {
     }
 
     function setFieldColSpan(fieldKey, span) {
-      span = Math.max(1, Math.min(4, parseInt(span) || 1));
+      span = Math.max(1, Math.min(4, parseInt(span, 10) || 1));
+      const now = Date.now();
+
+      // 1. templateFields'da güncelle ve zaman damgası ekle
       const f = (templateFields || []).find(tf => tf.key === fieldKey);
       if (f) {
         f.colSpan = span;
+        f.updatedAt = now;
       }
-      saveTemplateFieldsToStorage();
+
+      // 2. Bağımsız kalıcı ebat sözlüğünde (LAB_ERP_FIELD_COL_SPANS) sakla
+      const spansMap = getSavedFieldColSpans();
+      spansMap[fieldKey] = {
+        span: span,
+        updatedAt: now
+      };
+      saveFieldColSpansMapToStorage(spansMap, `Alan Boyutu: ${fieldKey} (${span}/4)`);
+
+      // 3. templateFields kalıcı depolamasını güncelle ve buluta tetikle
+      saveTemplateFieldsToStorage(fieldKey);
+
+      // 4. Formu ve popover'ı derhal güncelle
       applyAllFieldColSpans();
-      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified("Alan Boyutu: " + fieldKey + " (" + span + "/4)");
 
       if (typeof attachLiveModifierBarsToFields === "function" && typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         attachLiveModifierBarsToFields();
@@ -37350,11 +37438,21 @@ function closeModal() {
               });
             }
 
+            // Kullanıcının kaydettiği özel alan ebatlarını (colSpan) eksiksiz geri yükle
+            const savedSpans = getSavedFieldColSpans();
+            templateFields.forEach(tf => {
+              if (savedSpans[tf.key] !== undefined) {
+                const s = typeof savedSpans[tf.key] === "object" ? savedSpans[tf.key].span : savedSpans[tf.key];
+                tf.colSpan = Math.max(1, Math.min(4, parseInt(s, 10) || 1));
+              }
+            });
+
             customFields = templateFields.filter(f => !f.isStandard && f.enabled);
             SafeStorage.setItem("LAB_ERP_TEMPLATE_MIGRATION_VER", TEMPLATE_MIGRATION_VERSION);
             SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
             SafeStorage.setItem("LAB_ERP_CUSTOM_FIELDS", JSON.stringify(customFields));
             syncAllColumnsFromTemplateFields();
+            applyAllFieldColSpans();
             return;
           }
         }
@@ -37363,8 +37461,16 @@ function closeModal() {
       }
 
       templateFields = JSON.parse(JSON.stringify(DEFAULT_TEMPLATE_FIELDS));
+      const fallbackSpans = getSavedFieldColSpans();
+      templateFields.forEach(tf => {
+        if (fallbackSpans[tf.key] !== undefined) {
+          const s = typeof fallbackSpans[tf.key] === "object" ? fallbackSpans[tf.key].span : fallbackSpans[tf.key];
+          tf.colSpan = Math.max(1, Math.min(4, parseInt(s, 10) || 1));
+        }
+      });
       customFields = [];
       syncAllColumnsFromTemplateFields();
+      applyAllFieldColSpans();
     }
 
     
@@ -38925,6 +39031,7 @@ function saveMasterTemplate() {
       updatePinnedColumnsStyling();
       updateTableFooterAverages();
       applyTableFilters();
+      applyAllFieldColSpans();
     }
 
     function toggleAdminFieldLock(fieldKey, e) {
