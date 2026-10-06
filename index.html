@@ -946,10 +946,7 @@
           <span>Salt Okunur</span>
         </div>
 
-        <button onclick="resetAllColumnFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10.5px] font-medium border border-slate-200 flex items-center space-x-1 transition cursor-pointer">
-          <i class="fa-solid fa-filter-circle-xmark text-amber-500 text-[10px]"></i>
-          <span>Filtreleri Temizle</span>
-        </button>
+
 
         <button onclick="openTableModifierModal()" class="bg-purple-100 hover:bg-purple-200 text-purple-800 px-2 py-0.5 rounded text-[10.5px] font-medium border border-purple-200 flex items-center space-x-1 transition cursor-pointer" title="Şablonu Modifiye Et">
           <i class="fa-solid fa-shapes text-purple-600 text-[10px]"></i>
@@ -23233,6 +23230,7 @@ async function initializeLabErpApp() {
         // 1. Önce kayıtları IndexedDB / depolamadan kalıcı olarak yükle
         await loadLabRecordsFromStorage();
         ensureLabRecordsTurAndNumuneId();
+        try { sanitizeAstronomicalRecordIds(); } catch(e){}
         loadRawMaterialSpecsFromStorage();
         loadInvitationsFromStorage();
         checkUrlInvitation(); 
@@ -28688,7 +28686,18 @@ async function initializeLabErpApp() {
         const nid = getNumuneId(row);
         return `<td class="py-1 px-1.5 border-r border-slate-200 text-center font-bold text-purple-950 bg-purple-50/50 ${colClass}"><span class="inline-block px-1.5 py-0.5 rounded bg-purple-100/80 border border-purple-200 font-mono text-[11px]">${nid}</span>${attBadge}</td>`;
       } else if (k === "id" || k === "sira") {
-        return `<td class="py-1 px-1.5 border-r border-slate-200 text-center font-semibold text-slate-500 bg-slate-50 ${colClass}">#${row.id}</td>`;
+        let displayId = row.id;
+        if (typeof displayId === "number" && displayId >= 100000) {
+          const m = String(row.numuneId || "").match(/-(\d+)$/) || String(row.numuneId || "").match(/-(\d+)/);
+          if (m && parseInt(m[1], 10) < 100000) displayId = m[1];
+        } else if (typeof displayId === "string") {
+          const intD = parseInt(displayId, 10);
+          if (!isNaN(intD) && String(intD) === displayId && intD >= 100000) {
+            const m = String(row.numuneId || "").match(/-(\d+)$/) || String(row.numuneId || "").match(/-(\d+)/);
+            if (m && parseInt(m[1], 10) < 100000) displayId = m[1];
+          }
+        }
+        return `<td class="py-1 px-1.5 border-r border-slate-200 text-center font-semibold text-slate-500 bg-slate-50 ${colClass}">#${displayId}</td>`;
       } else if (k === "tarih") {
         const displayTarih = formatDateTimeTR(row.tarih);
         return `
@@ -31612,19 +31621,21 @@ function closeModal() {
         // KULLANICI KURALI: Tabloda silinen kayıtlar dahil en yüksek bir sonraki rakamı ver
         let recordNo = null;
         if (modalIdInput) {
-          const m = modalIdInput.match(/-(\d+)/);
+          const m = modalIdInput.match(/-(\d+)$/) || modalIdInput.match(/-(\d+)/);
           if (m) {
             const candidateNum = parseInt(m[1], 10);
-            // Sadece aktif kayıtlarda halihazırda bu ID kullanılıyorsa mükerrer say
-            const existsInActive = labRecords.some(r => r.id === candidateNum || (r.numuneId && String(r.numuneId).trim().toUpperCase() === modalIdInput.toUpperCase()));
-            if (!existsInActive && candidateNum > 0) {
-              recordNo = candidateNum;
+            if (candidateNum > 0 && candidateNum < 100000) {
+              const allUsed = getAllEverUsedSequenceNumbers();
+              // Silinenler dahil eşsiz kontrolü: numara daha önce hiç kullanılmamış olmalı
+              if (!allUsed.has(candidateNum)) {
+                recordNo = candidateNum;
+              }
             }
           }
         }
 
-        // Eğer geçerli bir numara yoksa veya aktif kayıtlarda zaten varsa, silinenler dahil en yüksek + 1 al
-        if (!recordNo) {
+        // Eğer geçerli bir numara yoksa veya silinenler dahil kullanılmışsa, sıradaki en yüksek + 1 al
+        if (!recordNo || recordNo >= 100000) {
           recordNo = getNextUniqueSequenceNumber();
         }
 
@@ -32232,6 +32243,7 @@ function closeModal() {
     // ========================================================
     // MUTLAK VE GERİ DÖNÜŞSÜZ TEKİL NUMUNE ID & SIRA MOTORU (HIZLANDIRILMIŞ BELLEK ÖNBELLEKLİ)
     // ========================================================
+    const MAX_VALID_RECORD_SEQ = 100000; // 100 bin üstü rakamlar asla kayıt no olamaz
     let CACHED_EVER_USED_NUMBERS = null;
     let CACHED_LAST_ISSUED_SEQ = null;
     let saveEverUsedNumbersTimer = null;
@@ -32245,13 +32257,16 @@ function closeModal() {
             const arr = JSON.parse(stored);
             if (Array.isArray(arr)) arr.forEach(n => {
               const val = parseInt(n, 10);
-              if (!isNaN(val) && val > 0 && val < 1000000000) CACHED_EVER_USED_NUMBERS.add(val);
+              if (!isNaN(val) && val > 0 && val < MAX_VALID_RECORD_SEQ) CACHED_EVER_USED_NUMBERS.add(val);
             });
           }
           const lastSeq = parseInt(SafeStorage.getItem("LAB_ERP_LAST_ISSUED_SEQ"), 10);
-          if (!isNaN(lastSeq) && lastSeq > 0 && lastSeq < 1000000000) {
+          if (!isNaN(lastSeq) && lastSeq > 0 && lastSeq < MAX_VALID_RECORD_SEQ) {
             CACHED_LAST_ISSUED_SEQ = lastSeq;
             CACHED_EVER_USED_NUMBERS.add(lastSeq);
+          } else if (!isNaN(lastSeq) && lastSeq >= MAX_VALID_RECORD_SEQ) {
+            SafeStorage.removeItem("LAB_ERP_LAST_ISSUED_SEQ");
+            CACHED_LAST_ISSUED_SEQ = null;
           }
         } catch(e) {}
       }
@@ -32261,21 +32276,36 @@ function closeModal() {
     function flushUsedSequenceNumbersToStorage() {
       try {
         if (CACHED_EVER_USED_NUMBERS) {
-          SafeStorage.setItem("LAB_ERP_EVER_USED_NUMBERS", JSON.stringify(Array.from(CACHED_EVER_USED_NUMBERS)));
+          const cleanArr = Array.from(CACHED_EVER_USED_NUMBERS).filter(n => typeof n === "number" && n > 0 && n < MAX_VALID_RECORD_SEQ);
+          SafeStorage.setItem("LAB_ERP_EVER_USED_NUMBERS", JSON.stringify(cleanArr));
         }
-        if (CACHED_LAST_ISSUED_SEQ) {
+        if (CACHED_LAST_ISSUED_SEQ && CACHED_LAST_ISSUED_SEQ < MAX_VALID_RECORD_SEQ) {
           SafeStorage.setItem("LAB_ERP_LAST_ISSUED_SEQ", String(CACHED_LAST_ISSUED_SEQ));
+        } else if (CACHED_LAST_ISSUED_SEQ && CACHED_LAST_ISSUED_SEQ >= MAX_VALID_RECORD_SEQ) {
+          SafeStorage.removeItem("LAB_ERP_LAST_ISSUED_SEQ");
+          CACHED_LAST_ISSUED_SEQ = null;
         }
       } catch(e) {}
     }
 
     function registerUsedSequenceNumber(num, flushImmediately = false) {
       if (num === undefined || num === null) return;
-      const p = parseInt(String(num).replace(/\D/g, ""), 10);
-      if (isNaN(p) || p <= 0 || p >= 1000000000) return;
+      let p = NaN;
+      if (typeof num === "number") {
+        p = Math.floor(num);
+      } else {
+        const s = String(num).trim();
+        const m = s.match(/-(\d+)$/) || s.match(/-(\d+)/);
+        if (m) {
+          p = parseInt(m[1], 10);
+        } else if (/^\d+$/.test(s)) {
+          p = parseInt(s, 10);
+        }
+      }
+      if (isNaN(p) || p <= 0 || p >= MAX_VALID_RECORD_SEQ) return;
       const nums = getCachedEverUsedNumbers();
       nums.add(p);
-      if (CACHED_LAST_ISSUED_SEQ === null || p > CACHED_LAST_ISSUED_SEQ) {
+      if (CACHED_LAST_ISSUED_SEQ === null || (p > CACHED_LAST_ISSUED_SEQ && p < MAX_VALID_RECORD_SEQ)) {
         CACHED_LAST_ISSUED_SEQ = p;
       }
       if (flushImmediately) {
@@ -32291,39 +32321,45 @@ function closeModal() {
     function extractNumbersFromRecord(r, numSet) {
       if (!r) return;
       
-      const inspectStr = (val) => {
+      const inspectVal = (val) => {
         if (val === undefined || val === null || val === "") return;
         if (typeof val === "number") {
           const intV = Math.floor(val);
-          if (!isNaN(intV) && intV > 0 && intV < 1000000000) numSet.add(intV);
+          if (!isNaN(intV) && intV > 0 && intV < MAX_VALID_RECORD_SEQ) numSet.add(intV);
           return;
         }
         const s = String(val).trim();
-        // Sadece tam sayı ise (örn: "3522")
+        // Sadece tam sayı ise (örn: "3522" veya "5198")
         const intDirect = parseInt(s, 10);
-        if (!isNaN(intDirect) && String(intDirect) === s && intDirect > 0 && intDirect < 1000000000) {
+        if (!isNaN(intDirect) && String(intDirect) === s && intDirect > 0 && intDirect < MAX_VALID_RECORD_SEQ) {
           numSet.add(intDirect);
           return;
         }
-        // Tireden sonraki sıra numarası: "FS/26-3522" -> 3522
-        const m = s.match(/-(\d+)/);
+        // GBR-5198 veya FS/26-3522 formatı (son tireden sonraki numara)
+        const m = s.match(/-(\d+)$/);
         if (m) {
           const p = parseInt(m[1], 10);
-          if (!isNaN(p) && p > 0 && p < 1000000000) numSet.add(p);
+          if (!isNaN(p) && p > 0 && p < MAX_VALID_RECORD_SEQ) numSet.add(p);
           return;
         }
-        // Eğik çizgiden sonraki 3-6 haneli sıra numarası: "FS/26/3522" -> 3522
-        const m2 = s.match(/\/(\d{3,6})(?:[^\d]|$)/);
+        const mGeneral = s.match(/-(\d+)/);
+        if (mGeneral) {
+          const p = parseInt(mGeneral[1], 10);
+          if (!isNaN(p) && p > 0 && p < MAX_VALID_RECORD_SEQ) numSet.add(p);
+          return;
+        }
+        // Eğik çizgiden sonraki sıra numarası: "FS/26/3522" -> 3522
+        const m2 = s.match(/\/(\d{3,5})(?:[^\d]|$)/);
         if (m2) {
           const p2 = parseInt(m2[1], 10);
-          if (!isNaN(p2) && p2 > 0 && p2 < 1000000000) numSet.add(p2);
+          if (!isNaN(p2) && p2 > 0 && p2 < MAX_VALID_RECORD_SEQ) numSet.add(p2);
           return;
         }
       };
 
-      inspectStr(r.id);
-      inspectStr(r.numuneId);
-      inspectStr(r.parti);
+      // YALNIZCA r.id ve r.numuneId taranır! ASLA r.parti (parti no, plaka, tarih vs.) taranmaz!
+      inspectVal(r.id);
+      inspectVal(r.numuneId);
     }
 
     function getAllEverUsedSequenceNumbers() {
@@ -32346,17 +32382,17 @@ function closeModal() {
           const arr = JSON.parse(s);
           if (Array.isArray(arr)) arr.forEach(id => {
             if (typeof id === "number") {
-              if (id > 0 && id < 1000000000) nums.add(id);
+              if (id > 0 && id < MAX_VALID_RECORD_SEQ) nums.add(id);
             } else {
               const str = String(id).trim();
               const intD = parseInt(str, 10);
-              if (!isNaN(intD) && String(intD) === str && intD > 0 && intD < 1000000000) {
+              if (!isNaN(intD) && String(intD) === str && intD > 0 && intD < MAX_VALID_RECORD_SEQ) {
                 nums.add(intD);
               } else {
-                const m = str.match(/-(\d+)/);
+                const m = str.match(/-(\d+)$/) || str.match(/-(\d+)/);
                 if (m) {
                   const p = parseInt(m[1], 10);
-                  if (!isNaN(p) && p > 0 && p < 1000000000) nums.add(p);
+                  if (!isNaN(p) && p > 0 && p < MAX_VALID_RECORD_SEQ) nums.add(p);
                 }
               }
             }
@@ -32375,13 +32411,13 @@ function closeModal() {
     function getNextUniqueSequenceNumber() {
       const usedNums = getAllEverUsedSequenceNumbers();
 
-      let maxNum = 3500;
+      let maxNum = 5198;
       let storedLast = parseInt(SafeStorage.getItem("LAB_ERP_LAST_ISSUED_SEQ"), 10);
-      if (!isNaN(storedLast) && storedLast > maxNum && storedLast < 1000000000) {
+      if (!isNaN(storedLast) && storedLast > maxNum && storedLast < MAX_VALID_RECORD_SEQ) {
         maxNum = storedLast;
       }
       usedNums.forEach(n => {
-        if (n > maxNum && n < 1000000000) {
+        if (typeof n === "number" && n > maxNum && n < MAX_VALID_RECORD_SEQ) {
           maxNum = n;
         }
       });
@@ -32392,10 +32428,69 @@ function closeModal() {
       usedNums.add(nextNum);
       try {
         SafeStorage.setItem("LAB_ERP_LAST_ISSUED_SEQ", String(nextNum));
-        SafeStorage.setItem("LAB_ERP_EVER_USED_NUMBERS", JSON.stringify(Array.from(usedNums)));
+        SafeStorage.setItem("LAB_ERP_EVER_USED_NUMBERS", JSON.stringify(Array.from(usedNums).filter(n => n < MAX_VALID_RECORD_SEQ)));
       } catch(e) {}
 
       return nextNum;
+    }
+
+    // ASTRONOMİK VEYA BOZUK KAYIT NUMARALARINI SIRADAN DÜZELTME MOTORU
+    function sanitizeAstronomicalRecordIds() {
+      try {
+        const storedLast = parseInt(SafeStorage.getItem("LAB_ERP_LAST_ISSUED_SEQ"), 10);
+        if (!isNaN(storedLast) && storedLast >= MAX_VALID_RECORD_SEQ) {
+          SafeStorage.removeItem("LAB_ERP_LAST_ISSUED_SEQ");
+          CACHED_LAST_ISSUED_SEQ = null;
+        }
+        const storedEver = SafeStorage.getItem("LAB_ERP_EVER_USED_NUMBERS");
+        if (storedEver) {
+          const arr = JSON.parse(storedEver);
+          if (Array.isArray(arr)) {
+            const cleanArr = arr.map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n > 0 && n < MAX_VALID_RECORD_SEQ);
+            SafeStorage.setItem("LAB_ERP_EVER_USED_NUMBERS", JSON.stringify(cleanArr));
+            if (CACHED_EVER_USED_NUMBERS) {
+              CACHED_EVER_USED_NUMBERS = new Set(cleanArr);
+            }
+          }
+        }
+      } catch(e) {}
+
+      let changed = false;
+      const cleanRecord = (r) => {
+        if (!r) return;
+        const numIdMatch = String(r.numuneId || "").match(/-(\d+)$/) || String(r.numuneId || "").match(/-(\d+)/);
+        const cleanSeqFromNumune = (numIdMatch && parseInt(numIdMatch[1], 10) < MAX_VALID_RECORD_SEQ) ? parseInt(numIdMatch[1], 10) : null;
+
+        let isLarge = false;
+        if (typeof r.id === "number" && r.id >= MAX_VALID_RECORD_SEQ) isLarge = true;
+        else if (typeof r.id === "string") {
+          const p = parseInt(r.id, 10);
+          if (!isNaN(p) && String(p) === r.id.trim() && p >= MAX_VALID_RECORD_SEQ) isLarge = true;
+        }
+
+        if (isLarge) {
+          if (cleanSeqFromNumune) {
+            r.id = cleanSeqFromNumune;
+          } else {
+            r.id = getNextUniqueSequenceNumber();
+          }
+          changed = true;
+        }
+
+        if (numIdMatch && parseInt(numIdMatch[1], 10) >= MAX_VALID_RECORD_SEQ) {
+          const prefix = String(r.numuneId).replace(/-\d+.*$/, "");
+          r.numuneId = `${prefix}-${r.id}`;
+          changed = true;
+        }
+      };
+
+      if (Array.isArray(labRecords)) labRecords.forEach(cleanRecord);
+      if (Array.isArray(deletedRecords)) deletedRecords.forEach(cleanRecord);
+
+      if (changed) {
+        if (typeof saveLabRecordsToStorage === "function") saveLabRecordsToStorage();
+        if (typeof saveDeletedRecordsToStorage === "function") saveDeletedRecordsToStorage();
+      }
     }
 
     // SADECE ÖN EK (FS, FG, O vb.) DEĞİŞTİRME MOTORU - MEVCUT KAYIT NUMARASINI KESİNLİKLE KORUR
@@ -35699,13 +35794,17 @@ function closeModal() {
     // ÜRÜN KARTLARI VE STANDART DEĞERLER TABLO YÖNETİMİ
     // ==========================================
     function openProductCardsTableModal() {
-      const modal = document.getElementById("productCardsTableModal");
-      if (!modal) return;
-      const searchInput = document.getElementById("productCardsSearchInput");
-      if (searchInput) searchInput.value = "";
-      renderProductCardsTableRows();
-      modal.classList.remove("hidden");
-      modal.style.display = "flex";
+      try {
+        const modal = document.getElementById("productCardsTableModal");
+        if (!modal) return;
+        const searchInput = document.getElementById("productCardsSearchInput");
+        if (searchInput) searchInput.value = "";
+        renderProductCardsTableRows();
+        modal.classList.remove("hidden");
+        modal.style.display = "flex";
+      } catch (err) {
+        console.error("openProductCardsTableModal hatası:", err);
+      }
     }
 
     function closeProductCardsTableModal() {
@@ -35786,9 +35885,12 @@ function closeModal() {
       };
 
       tbody.innerHTML = filtered.map(name => {
-        const card = (typeof getProductCard === "function") ? getProductCard(name) : (PRODUCT_CARDS ? PRODUCT_CARDS[name] : null) || {};
-        const specs = (typeof parseFertilizerSpecs === "function") ? parseFertilizerSpecs(name) : card;
-        const nSpecs = (typeof getProductNitrogenSpecs === "function") ? getProductNitrogenSpecs(name) : {};
+        const rawCard = (typeof getProductCard === "function") ? getProductCard(name) : (PRODUCT_CARDS ? PRODUCT_CARDS[name] : null);
+        const card = rawCard || {};
+        const rawSpecs = (typeof parseFertilizerSpecs === "function") ? parseFertilizerSpecs(name) : card;
+        const specs = rawSpecs || {};
+        const rawNSpecs = (typeof getProductNitrogenSpecs === "function") ? getProductNitrogenSpecs(name) : {};
+        const nSpecs = rawNSpecs || {};
 
         const topAzot = card.topAzot || specs.topAzot || 0;
         const nh4 = card.targetNH4 || card.nh4N || nSpecs.targetNH4 || 0;
