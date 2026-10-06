@@ -636,7 +636,7 @@
     }
 
     #officialReportModal {
-      z-index: 9999999 !important;
+      z-index: 999999999 !important;
       position: fixed !important;
       inset: 0 !important;
     }
@@ -3197,7 +3197,7 @@
 <!-- ========================================================
        3. MODAL: FERGO RESMİ ANALİZ RAPORU (F7.8-0-3.00) MODALI
        ======================================================== -->
-  <div id="officialReportModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[500000] flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden" style="z-index: 500000 !important; display: none;">
+  <div id="officialReportModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden z-[2147483647]" style="z-index: 2147483647 !important; display: none;">
     <!-- Üst Kontrol Çubuğu (no-print) -->
     <div class="sticky top-0 z-50 bg-slate-900/90 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center justify-between gap-4 max-w-4xl w-full mb-4 border border-slate-700 no-print">
       <div class="flex items-center space-x-2.5">
@@ -16102,9 +16102,12 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
       { key: "canEditRecord", label: "Kayıt Düzenleme", desc: "Mevcut kayıtları ve tablo hücrelerini düzenleyebilir" },
       { key: "canDeleteRecord", label: "Kayıt Silme", desc: "Analiz kayıtlarını silip çöp kutusuna taşıyabilir" },
       { key: "canModifyTemplate", label: "Şablon & Form Alanlarını Düzenleme", desc: "Form alanlarının başlıklarını, sıralamasını, gizliliğini ve şablon ayarlarını değiştirebilir" },
-      { key: "canManageSettings", label: "Tanımlamalar & Ayarlar", desc: "Gübre, hat, göz, personel ve süreç listelerini yönetebilir" },
+      { key: "canManageSettings", label: "Tanımlamalar & Ayarlar", desc: "Gübre, hat, göz, personel ve süreç listelerini yönetebilir, yeni seçenek ekleyebilir" },
+      { key: "canManageProductCards", label: "Ürün Kartları & Spesifikasyon Yönetimi", desc: "Kayıtlı ürün kartlarını, standart değerleri ve azot türevlerini görüntüleyip güncelleyebilir" },
+      { key: "canManageAnalysisMethods", label: "Analiz Metotları Yönetimi (F7.1-0-5)", desc: "Resmi analiz metotlarını ve standart açıklamalarını güncelleyebilir" },
+      { key: "canExportData", label: "Excel & Rapor İndirme", desc: "Excel (.xls) ve CSV raporlarını bilgisayara indirebilir" },
+      { key: "canImportData", label: "Excel'den Veri Yükleme (İçe Aktarma)", desc: "Excel (.xlsx, .xls) veya CSV dosyasından sisteme toplu analiz verisi yükleyebilir" },
       { key: "canManageBackups", label: "Veri Güvenliği & Yedek", desc: "Yedek alma, geri yükleme ve çöp kutusu yönetimi" },
-      { key: "canExportData", label: "Veri Dışa Aktarma", desc: "Excel ve CSV raporlarını indirebilir" },
       { key: "canManageUsers", label: "Kullanıcı & Yetki Yönetimi", desc: "Personel hesapları ve yetkilendirmeleri yönetebilir" },
       { key: "canEditReadOnlyFields", label: "Korumalı / Salt Okunur Alanları Güncelleme", desc: "Şablonda 'Salt Okunur' olarak kilitlenmiş alanlara veri girişi yapabilir ve güncelleyebilir" }
     ];
@@ -16120,8 +16123,11 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           canDeleteRecord: true,
           canModifyTemplate: true,
           canManageSettings: true,
-          canManageBackups: true,
+          canManageProductCards: true,
+          canManageAnalysisMethods: true,
           canExportData: true,
+          canImportData: true,
+          canManageBackups: true,
           canManageUsers: true,
           canEditReadOnlyFields: true
         }
@@ -16136,8 +16142,11 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           canDeleteRecord: true,
           canModifyTemplate: true,
           canManageSettings: true,
-          canManageBackups: true,
+          canManageProductCards: true,
+          canManageAnalysisMethods: true,
           canExportData: true,
+          canImportData: true,
+          canManageBackups: true,
           canManageUsers: false,
           canEditReadOnlyFields: true
         }
@@ -16152,15 +16161,18 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           canDeleteRecord: false,
           canModifyTemplate: false,
           canManageSettings: false,
-          canManageBackups: false,
+          canManageProductCards: false,
+          canManageAnalysisMethods: false,
           canExportData: true,
+          canImportData: false,
+          canManageBackups: false,
           canManageUsers: false,
           canEditReadOnlyFields: false
         }
       },
       {
         key: "viewer",
-        name: "Salt Okunur / İzleyici (Read Only - Yalnızca Görüntüleme)",
+        name: "Salt Okunur / İzleyici (Yalnızca Excel İndirebilir)",
         isSystem: true,
         isReadOnly: true,
         permissions: {
@@ -16169,8 +16181,11 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           canDeleteRecord: false,
           canModifyTemplate: false,
           canManageSettings: false,
-          canManageBackups: false,
+          canManageProductCards: false,
+          canManageAnalysisMethods: false,
           canExportData: true,
+          canImportData: false,
+          canManageBackups: false,
           canManageUsers: false,
           canEditReadOnlyFields: false
         }
@@ -16590,8 +16605,11 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         primaryAdmin.permissions.canDeleteRecord = true;
         primaryAdmin.permissions.canModifyTemplate = true;
         primaryAdmin.permissions.canManageSettings = true;
-        primaryAdmin.permissions.canManageBackups = true;
+        primaryAdmin.permissions.canManageProductCards = true;
+        primaryAdmin.permissions.canManageAnalysisMethods = true;
         primaryAdmin.permissions.canExportData = true;
+        primaryAdmin.permissions.canImportData = true;
+        primaryAdmin.permissions.canManageBackups = true;
         primaryAdmin.permissions.canManageUsers = true;
         primaryAdmin.permissions.canEditReadOnlyFields = true;
         primaryAdmin.permissions.canViewAlwaysHiddenFields = true;
@@ -16629,8 +16647,11 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
       tuncay.permissions.canDeleteRecord = true;
       tuncay.permissions.canModifyTemplate = true;
       tuncay.permissions.canManageSettings = true;
-      tuncay.permissions.canManageBackups = true;
+      tuncay.permissions.canManageProductCards = true;
+      tuncay.permissions.canManageAnalysisMethods = true;
       tuncay.permissions.canExportData = true;
+      tuncay.permissions.canImportData = true;
+      tuncay.permissions.canManageBackups = true;
       tuncay.permissions.canManageUsers = true;
       tuncay.permissions.canEditReadOnlyFields = true;
       tuncay.permissions.canViewAlwaysHiddenFields = true;
@@ -16711,10 +16732,18 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         }
       }
       if (activeUser.role === "admin") return true;
+
+      // Salt Okunur (Read Only) veya Sadece Excel İndirebilir Yetkisine Sahip Kullanıcılar:
       if (activeUser.isReadOnly || activeUser.role === "viewer" || activeUser.role === "readonly") {
-        if (permKey === "canExportData") return !!(activeUser.permissions && activeUser.permissions.canExportData);
-        return false;
+        // canExportData yetkisi varsa yalnızca Excel / CSV indirebilir
+        if (permKey === "canExportData") {
+          return !(activeUser.permissions && activeUser.permissions.canExportData === false);
+        }
+        // Diğer tüm yetkiler (Ürün Kartları, Metotlar, Ayarlar, Excel Yükleme vb.)
+        // yönetici tarafından AÇIKÇA 'true' verilmemişse kesinlikle YASAKTIR!
+        return !!(activeUser.permissions && activeUser.permissions[permKey] === true);
       }
+
       return !!(activeUser.permissions && activeUser.permissions[permKey]);
     }
 
@@ -17073,10 +17102,25 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         setButtonPassiveState(btn, canMod, "Şablon ve form düzenleme yetkiniz bulunmamaktadır.", "Şablon Stüdyosu (Yetkisiz - Pasif)");
       });
 
-      // 3. canManageSettings: Tanımlamalar & Ayarlar Butonu
-      const btnsSettings = document.querySelectorAll("button[onclick*='openMasterDataModal()']");
+      // 3. canManageSettings: Tanımlamalar & Ayarlar Butonları (Hem üst bar hem modal içi)
+      const canSettings = hasPermission("canManageSettings");
+      const btnsSettings = document.querySelectorAll("button[onclick*='handleActiveAppSettings()'], button[onclick*='openMasterDataModal()']");
       btnsSettings.forEach(btn => {
-        setButtonPassiveState(btn, hasPermission("canManageSettings"), "Tanımlamaları ve ayarları yönetme yetkiniz bulunmamaktadır.", "Tanımlamalar (Yetkisiz - Pasif)");
+        setButtonPassiveState(btn, canSettings, "Tanımlamaları ve ayarları yönetme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.", "Tanımlamalar & Ayarlar (Yetkisiz - Pasif)");
+      });
+
+      // 3.1 canManageProductCards: Ürün Kartları Butonu
+      const canProdCards = hasPermission("canManageProductCards");
+      const btnsProdCards = document.querySelectorAll("button[onclick*='openProductCardsTableModal()'], button[onclick*='openProductCardModal(']");
+      btnsProdCards.forEach(btn => {
+        setButtonPassiveState(btn, canProdCards, "Ürün kartlarını görüntüleme ve düzenleme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.", "Ürün Kartları (Yetkisiz - Pasif)");
+      });
+
+      // 3.2 canManageAnalysisMethods: Analiz Metotları Butonu
+      const canMethods = hasPermission("canManageAnalysisMethods");
+      const btnsMethods = document.querySelectorAll("button[onclick*='openAnalysisMethodsModal()']");
+      btnsMethods.forEach(btn => {
+        setButtonPassiveState(btn, canMethods, "Analiz metotlarını görüntüleme ve düzenleme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.", "Analiz Metotları (Yetkisiz - Pasif)");
       });
 
       // 4. canManageBackups: Veri Güvenliği & Yedek Butonları
@@ -17085,11 +17129,18 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         setButtonPassiveState(btn, hasPermission("canManageBackups"), "Veri güvenliği ve yedekleme yönetimi yetkiniz bulunmamaktadır.", "Veri Güvenliği (Yetkisiz - Pasif)");
       });
 
-      // 5. canExportData: Excel İndir Grubu
+      // 5. canExportData: Excel İndir Grubu (İndirme Butonu)
       const btnExcel = document.getElementById("btnExcelDropdown") || document.querySelector("#excelDropdownContainer button");
       if (btnExcel) {
         setButtonPassiveState(btnExcel, hasPermission("canExportData"), "Veri dışa aktarma (Excel / CSV) yetkiniz bulunmamaktadır.", "Excel İndirme (Yetkisiz - Pasif)");
       }
+
+      // 5.1 canImportData: Excel'den Veri Yükleme (İçe Aktarma) Butonu
+      const canImport = hasPermission("canImportData");
+      const btnsImport = document.querySelectorAll("button[onclick*='openExcelImportModal()']");
+      btnsImport.forEach(btn => {
+        setButtonPassiveState(btn, canImport, "Excel dosyası yükleme ve içe aktarma yetkiniz bulunmamaktadır. Yalnızca Excel indirebilirsiniz.", "Excel Yükle (Yetkisiz - Pasif)");
+      });
 
       // 6. canManageUsers: Menüdeki Kullanıcı & Yetki Yönetimi
       const btnMenuUsers = document.getElementById("btnMenuOpenUserMgmt");
@@ -17250,8 +17301,9 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
       if (roToggle) roToggle.checked = isRO;
       const permKeys = [
         "canCreateRecord", "canEditRecord", "canDeleteRecord",
-        "canModifyTemplate", "canManageSettings", "canManageBackups",
-        "canExportData", "canManageUsers", "canEditReadOnlyFields"
+        "canModifyTemplate", "canManageSettings", "canManageProductCards",
+        "canManageAnalysisMethods", "canExportData", "canImportData",
+        "canManageBackups", "canManageUsers", "canEditReadOnlyFields"
       ];
       permKeys.forEach(k => {
         const el = document.getElementById("perm_" + k);
@@ -17404,8 +17456,11 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de yeni şab
         canDeleteRecord: isReadOnly ? false : (document.getElementById("perm_canDeleteRecord") ? document.getElementById("perm_canDeleteRecord").checked : false),
         canModifyTemplate: isReadOnly ? false : (document.getElementById("perm_canModifyTemplate") ? document.getElementById("perm_canModifyTemplate").checked : false),
         canManageSettings: isReadOnly ? false : (document.getElementById("perm_canManageSettings") ? document.getElementById("perm_canManageSettings").checked : false),
-        canManageBackups: isReadOnly ? false : (document.getElementById("perm_canManageBackups") ? document.getElementById("perm_canManageBackups").checked : false),
+        canManageProductCards: isReadOnly ? false : (document.getElementById("perm_canManageProductCards") ? document.getElementById("perm_canManageProductCards").checked : false),
+        canManageAnalysisMethods: isReadOnly ? false : (document.getElementById("perm_canManageAnalysisMethods") ? document.getElementById("perm_canManageAnalysisMethods").checked : false),
         canExportData: document.getElementById("perm_canExportData") ? document.getElementById("perm_canExportData").checked : true,
+        canImportData: isReadOnly ? false : (document.getElementById("perm_canImportData") ? document.getElementById("perm_canImportData").checked : false),
+        canManageBackups: isReadOnly ? false : (document.getElementById("perm_canManageBackups") ? document.getElementById("perm_canManageBackups").checked : false),
         canManageUsers: isReadOnly ? false : (document.getElementById("perm_canManageUsers") ? document.getElementById("perm_canManageUsers").checked : false),
         canEditReadOnlyFields: isReadOnly ? false : (document.getElementById("perm_canEditReadOnlyFields") ? document.getElementById("perm_canEditReadOnlyFields").checked : false)
       };
@@ -19422,6 +19477,12 @@ let genericAppSortState = {};
     var activeGenericSettingsTab = "durum";
 
     function handleActiveAppSettings() {
+      if (!hasPermission("canManageSettings")) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Tanımlamaları ve ayarları yönetme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.");
+        }
+        return;
+      }
       const currentAppId = (typeof activeWorkspaceAppId !== "undefined" && activeWorkspaceAppId) ? activeWorkspaceAppId : "app_analiz";
       if (currentAppId === "app_analiz") {
         openMasterDataModal();
@@ -20967,6 +21028,12 @@ ${cols.map(c => {
 
     function isClickInsideDialogCard(modalEl, target) {
       if (!modalEl || !target) return false;
+      // Ürün kartı yanlarındaki gezinme oklarına tıklanmışsa kesinlikle modal dışı sayma
+      if (modalEl.id === "productCardModal") {
+        if (target.closest && (target.closest("#btnPrevProductCard") || target.closest("#btnNextProductCard"))) {
+          return true;
+        }
+      }
       if (target.closest("#fieldConfigPopover, #userMenuDropdown, #excelExportDropdownMenu, .podio-color-popover, .podio-field-dropdown, #unsavedChangesConfirmModal, .flatpickr-calendar, datalist")) {
         return true;
       }
@@ -28296,8 +28363,11 @@ async function initializeLabErpApp() {
       const thAct2 = document.createElement("th");
       thAct2.className = "py-1 px-0.5 border-r border-slate-300 w-[78px] min-w-[78px] text-center sticky-actions-col bg-slate-200 select-none";
       thAct2.innerHTML = `
-        <div class="flex items-center justify-center space-x-1">
-          <button onclick="resetAllColumnFilters()" title="Tüm Filtreleri Sıfırla" class="text-slate-500 hover:text-indigo-600 p-0.5"><i class="fa-solid fa-arrows-rotate text-[10px]"></i></button>
+        <div class="flex items-center justify-center px-0.5">
+          <button type="button" onclick="resetAllColumnFilters()" title="Tüm Tablo Filtrelerini Temizle / Sıfırla" class="px-1.5 py-0.5 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-300 hover:border-rose-300 rounded text-[9.5px] font-bold flex items-center justify-center space-x-1 transition cursor-pointer shadow-2xs w-full">
+            <i class="fa-solid fa-filter-circle-xmark text-rose-500 text-[10px]"></i>
+            <span>Sıfırla</span>
+          </button>
         </div>
       `;
       r2.appendChild(thAct2);
@@ -28464,6 +28534,16 @@ async function initializeLabErpApp() {
             el.value = SIDEBAR_ACTIVE_FILTERS[matchedSync.facetId];
           }
         }
+      });
+
+      // Kayıtlı filtreleri anında geri yükle
+      if (typeof restoreActiveTableFilters === "function") {
+        restoreActiveTableFilters();
+      }
+
+      // Açılır liste filtre butonlarının etiketlerini ve aktif durumlarını güncelle
+      r2.querySelectorAll(".custom-searchable-filter-wrapper select").forEach(sel => {
+        updateDropdownFilterTriggerLabel(sel.id, sel.value);
       });
 
       // Dondurulmuş Üst Blok: 1. Satır ile 2. Satır arasında sıfır boşluk ve 1px örtüşme sağlayarak aradan veri sızmasını kesin olarak engelle
@@ -28857,6 +28937,285 @@ async function initializeLabErpApp() {
       }
     });
 
+    
+    // ========================================================
+    // TABLO BAŞLIĞI AÇILIR LİSTE ARAMALI FİLTRELEME MOTORU (SEARCHABLE DROPDOWNS)
+    // ========================================================
+    var activeDropdownFilterId = null;
+    var activeDropdownFilterOptions = [];
+
+    function renderSearchableDropdownCell(inputId, fieldLabel, defaultLabel, optionsHtml) {
+      return `
+        <div class="relative flex items-center w-full px-0.5 custom-searchable-filter-wrapper" data-filter-id="${inputId}">
+          <!-- Gizli select (durum saklama, filtreleme ve uyumluluk için) -->
+          <select id="${inputId}" 
+                  style="display: none;" 
+                  class="hidden"
+                  onchange="applyTableFilters(); updateDropdownFilterTriggerLabel('${inputId}', this.value);">
+            <option value="ALL">${escapeHtml(defaultLabel)}</option>
+            ${optionsHtml}
+          </select>
+          <!-- Açılır Arama Popover'ını Tetikleyen Buton (Açıldığında En Üstte Arama Alanı Vardır) -->
+          <button type="button" 
+                  id="btn_filter_${inputId}" 
+                  onclick="openTableDropdownFilterPopover('${inputId}', '${escapeHtml(fieldLabel)}', event)" 
+                  class="excel-filter-input font-medium text-slate-700 bg-white border border-slate-300 rounded cursor-pointer w-full text-[10.5px] py-0.5 px-1.5 flex items-center justify-between text-left focus:ring-1 focus:ring-blue-500 hover:border-blue-400 transition shadow-2xs"
+                  title="Filtrele ve Ara: ${escapeHtml(fieldLabel)}">
+            <span class="truncate block flex-1 font-normal text-slate-700 text-[10px]" id="label_filter_${inputId}">${escapeHtml(defaultLabel)}</span>
+            <i class="fa-solid fa-chevron-down text-[8px] text-slate-400 ml-1 shrink-0"></i>
+          </button>
+        </div>
+      `;
+    }
+
+    function updateDropdownFilterTriggerLabel(inputId, val) {
+      const selectEl = document.getElementById(inputId);
+      const btnEl = document.getElementById("btn_filter_" + inputId);
+      const labelEl = document.getElementById("label_filter_" + inputId);
+      if (!selectEl) return;
+      
+      const isFiltered = (val && val !== "ALL" && val !== "");
+      
+      if (labelEl) {
+        if (isFiltered) {
+          const selectedOpt = selectEl.options[selectEl.selectedIndex];
+          labelEl.innerText = selectedOpt ? selectedOpt.text : val;
+        } else {
+          const defaultOpt = selectEl.options[0];
+          labelEl.innerText = defaultOpt ? defaultOpt.text : "Tümü";
+        }
+      }
+
+      if (btnEl) {
+        if (isFiltered) {
+          btnEl.classList.add("bg-blue-50", "border-blue-500", "text-blue-900", "font-bold", "ring-1", "ring-blue-300");
+          btnEl.classList.remove("bg-white", "border-slate-300", "text-slate-700");
+          if (labelEl) {
+            labelEl.classList.add("text-blue-900", "font-bold");
+            labelEl.classList.remove("text-slate-700", "font-normal");
+          }
+        } else {
+          btnEl.classList.remove("bg-blue-50", "border-blue-500", "text-blue-900", "font-bold", "ring-1", "ring-blue-300");
+          btnEl.classList.add("bg-white", "border-slate-300", "text-slate-700");
+          if (labelEl) {
+            labelEl.classList.remove("text-blue-900", "font-bold");
+            labelEl.classList.add("text-slate-700", "font-normal");
+          }
+        }
+      }
+    }
+
+    function openTableDropdownFilterPopover(inputId, title, event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const popover = document.getElementById("tableDropdownFilterPopover");
+      if (!popover) return;
+
+      const selectEl = document.getElementById(inputId);
+      if (!selectEl) return;
+
+      activeDropdownFilterId = inputId;
+
+      // Başlığı ayarla
+      const titleEl = document.getElementById("tableDropdownFilterTitle");
+      if (titleEl) titleEl.innerText = title ? `${title} Filtresi` : "Filtre Seçimi";
+
+      // Arama kutusunu temizle
+      const searchInput = document.getElementById("tableDropdownFilterSearchInput");
+      if (searchInput) searchInput.value = "";
+      const clearBtn = document.getElementById("btnClearTableDropdownFilterSearch");
+      if (clearBtn) clearBtn.classList.add("hidden");
+
+      // Seçenekleri topla
+      const options = [];
+      const currentVal = selectEl.value || "ALL";
+
+      Array.from(selectEl.options || []).forEach(opt => {
+        options.push({
+          value: opt.value,
+          text: opt.text,
+          isSelected: (opt.value === currentVal)
+        });
+      });
+
+      activeDropdownFilterOptions = options;
+      renderTableDropdownFilterOptions(options, currentVal);
+
+      // Konumlandırma: Tıklanan butonun hemen altında aç
+      const triggerBtn = document.getElementById("btn_filter_" + inputId) || selectEl.parentElement;
+      const rect = triggerBtn.getBoundingClientRect();
+      
+      let left = rect.left;
+      let top = rect.bottom + 4;
+      const popoverWidth = 260;
+      const popoverHeight = 320;
+
+      if (left + popoverWidth > window.innerWidth - 10) {
+        left = Math.max(10, window.innerWidth - popoverWidth - 10);
+      }
+      if (top + popoverHeight > window.innerHeight - 10) {
+        top = Math.max(10, rect.top - popoverHeight - 4);
+      }
+
+      popover.style.left = `${left}px`;
+      popover.style.top = `${top}px`;
+      popover.classList.remove("hidden");
+      popover.style.display = "flex";
+
+      // Arama alanına anında otomatik odaklan (kullanıcı hemen yazabilsin)
+      setTimeout(() => {
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }, 50);
+    }
+
+    function closeTableDropdownFilterPopover() {
+      const popover = document.getElementById("tableDropdownFilterPopover");
+      if (popover) {
+        popover.classList.add("hidden");
+        popover.style.display = "none";
+      }
+      activeDropdownFilterId = null;
+    }
+
+    function onTableDropdownFilterSearchInput(query) {
+      const q = String(query || "").trim().toLocaleLowerCase("tr-TR");
+      const clearBtn = document.getElementById("btnClearTableDropdownFilterSearch");
+      if (clearBtn) {
+        if (q) clearBtn.classList.remove("hidden");
+        else clearBtn.classList.add("hidden");
+      }
+
+      const selectEl = document.getElementById(activeDropdownFilterId);
+      const currentVal = selectEl ? selectEl.value : "ALL";
+
+      if (!q) {
+        renderTableDropdownFilterOptions(activeDropdownFilterOptions, currentVal);
+        return;
+      }
+
+      const filtered = activeDropdownFilterOptions.filter(opt => {
+        if (opt.value === "ALL") return true; // Tümü seçeneği her zaman üstte kalabilir
+        return String(opt.text || "").toLocaleLowerCase("tr-TR").includes(q) ||
+               String(opt.value || "").toLocaleLowerCase("tr-TR").includes(q);
+      });
+
+      renderTableDropdownFilterOptions(filtered, currentVal, q);
+    }
+
+    function clearTableDropdownFilterSearch() {
+      const searchInput = document.getElementById("tableDropdownFilterSearchInput");
+      if (searchInput) {
+        searchInput.value = "";
+        searchInput.focus();
+      }
+      onTableDropdownFilterSearchInput("");
+    }
+
+    function renderTableDropdownFilterOptions(options, currentVal, searchQuery = "") {
+      const listEl = document.getElementById("tableDropdownFilterOptionsList");
+      const countEl = document.getElementById("tableDropdownFilterMatchCount");
+      if (!listEl) return;
+
+      const actualItemsCount = options.filter(o => o.value !== "ALL").length;
+      if (countEl) {
+        countEl.innerText = `${actualItemsCount} seçenek`;
+      }
+
+      if (options.length === 0) {
+        listEl.innerHTML = `
+          <div class="py-6 text-center text-slate-400 text-xs italic">
+            "${escapeHtml(searchQuery)}" ile eşleşen öğe bulunamadı.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = options.map((opt) => {
+        const isAll = (opt.value === "ALL");
+        const isSelected = (opt.value === currentVal);
+        let iconHtml = isSelected 
+          ? '<i class="fa-solid fa-check text-blue-600 text-xs shrink-0 mr-1.5"></i>' 
+          : '<span class="w-3.5 inline-block shrink-0 mr-1.5"></span>';
+
+        if (isAll) {
+          return `
+            <div onclick="selectDropdownFilterOption('${escapeHtml(opt.value)}')" 
+                 class="px-2.5 py-1.5 hover:bg-blue-50 flex items-center justify-between text-xs cursor-pointer rounded transition font-semibold ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-slate-600'} border-b border-slate-200 mb-1">
+              <div class="flex items-center min-w-0">
+                ${iconHtml}
+                <span class="truncate">${escapeHtml(opt.text)}</span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-normal px-1 bg-slate-100 rounded">Sıfırla</span>
+            </div>
+          `;
+        }
+
+        return `
+          <div onclick="selectDropdownFilterOption('${escapeHtml(opt.value)}')" 
+               class="px-2.5 py-1.5 hover:bg-blue-50 flex items-center justify-between text-xs cursor-pointer rounded transition ${isSelected ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-700 hover:text-slate-900'}">
+            <div class="flex items-center min-w-0">
+              ${iconHtml}
+              <span class="truncate">${escapeHtml(opt.text)}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function selectDropdownFilterOption(val) {
+      if (!activeDropdownFilterId) return;
+      const selectEl = document.getElementById(activeDropdownFilterId);
+      if (selectEl) {
+        selectEl.value = val;
+        updateDropdownFilterTriggerLabel(activeDropdownFilterId, val);
+        if (typeof applyTableFilters === "function") {
+          applyTableFilters();
+        }
+      }
+      closeTableDropdownFilterPopover();
+    }
+
+    
+    window.onTableDropdownFilterSearch = onTableDropdownFilterSearchInput;
+    window.onTableDropdownFilterSearchInput = onTableDropdownFilterSearchInput;
+    window.openTableDropdownFilterPopover = openTableDropdownFilterPopover;
+    window.closeTableDropdownFilterPopover = closeTableDropdownFilterPopover;
+    window.clearTableDropdownFilterSearch = clearTableDropdownFilterSearch;
+    window.selectDropdownFilterOption = selectDropdownFilterOption;
+    window.clearCurrentDropdownFilter = clearCurrentDropdownFilter;
+
+function clearCurrentDropdownFilter() {
+      selectDropdownFilterOption("ALL");
+    }
+
+    function onTableDropdownFilterKeyDown(event) {
+      if (event.key === "Escape") {
+        closeTableDropdownFilterPopover();
+        event.preventDefault();
+      } else if (event.key === "Enter") {
+        const listEl = document.getElementById("tableDropdownFilterOptionsList");
+        const firstOption = listEl ? listEl.querySelector("[onclick*='selectDropdownFilterOption']") : null;
+        if (firstOption) {
+          firstOption.click();
+          event.preventDefault();
+        }
+      }
+    }
+
+    window.openTableDropdownFilterPopover = openTableDropdownFilterPopover;
+    window.closeTableDropdownFilterPopover = closeTableDropdownFilterPopover;
+    window.selectDropdownFilterOption = selectDropdownFilterOption;
+    window.clearCurrentDropdownFilter = clearCurrentDropdownFilter;
+    window.onTableDropdownFilterSearchInput = onTableDropdownFilterSearchInput;
+    window.clearTableDropdownFilterSearch = clearTableDropdownFilterSearch;
+    window.onTableDropdownFilterKeyDown = onTableDropdownFilterKeyDown;
+    window.updateDropdownFilterTriggerLabel = updateDropdownFilterTriggerLabel;
+
     function renderFilterCellHtml(f) {
       const k = f.fieldKey || f.key;
       if (f.subType === "tartim" || f.subType === "sarfiyat" || f.subType === "yas" || f.key.endsWith("_g") || f.key.endsWith("_ml") || f.key.startsWith("yas_") || f.key.startsWith("nem_")) {
@@ -28880,55 +29239,46 @@ async function initializeLabErpApp() {
         `;
       } else if (f.key === "vardiya") {
         let vOpts = (VARDIYA_LIST || ["08:00-20:00", "20:00-08:00"]).map(v => `<option value="${v}">${v}</option>`).join("");
-        return `
-          <select id="f_vardiya" onchange="applyTableFilters()" class="excel-filter-input text-center">
-            <option value="ALL">Tümü</option>
-            ${vOpts}
-          </select>
-        `;
+        return renderSearchableDropdownCell("f_vardiya", "Vardiya", "Tümü", vOpts);
       } else if (f.key === "urun") {
-        const allProds = Array.from(new Set([...(URUN_LIST || []), ...((typeof labRecords !== "undefined" && Array.isArray(labRecords)) ? labRecords.map(r => r.urunAdi || r.urun).filter(Boolean) : [])]));
+        const allProds = Array.from(new Set([...(URUN_LIST || []), ...((typeof labRecords !== "undefined" && Array.isArray(labRecords)) ? labRecords.map(r => r.urunAdi || r.urun).filter(Boolean) : [])])).sort((a,b) => String(a).localeCompare(String(b), 'tr-TR'));
         let opts = allProds.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join("");
-        return `<select id="f_urun" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tüm Ürünler</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_urun", "Numune / Ürün Adı", "Tüm Ürünler", opts);
       } else if (f.key === "hat") {
         let opts = (HAT_LIST||[]).map(h => `<option value="${h}">${h}</option>`).join("");
-        return `<select id="f_hat" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_hat", "Hat No", "Tümü", opts);
       } else if (f.key === "goz") {
         let opts = (GOZ_LIST||[]).map(g => `<option value="${g}">${g}</option>`).join("");
-        return `<select id="f_goz" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_goz", "Göz No", "Tümü", opts);
       } else if (f.key === "baz") {
         const bOpts = getCategoryFieldOptions("baz");
         const bOptsHtml = (bOpts || ["YAŞ", "KURU"]).map(b => `<option value="${b}">${b}</option>`).join("");
-        return `<select id="f_baz" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${bOptsHtml}</select>`;
+        return renderSearchableDropdownCell("f_baz", "Baz", "Tümü", bOptsHtml);
       } else if (f.key === "personel") {
-        let opts = (PERSONEL_LIST||[]).map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
-        return `
-          <select id="f_personel" onchange="applyTableFilters()" class="excel-filter-input" title="Personel Filtresi">
-            <option value="ALL">Personel (Tümü)</option>
-            ${opts}
-          </select>
-        `;
+        const allPersonnel = Array.from(new Set([...(PERSONEL_LIST || []), ...((typeof labRecords !== "undefined" && Array.isArray(labRecords)) ? labRecords.flatMap(r => Array.isArray(r.personel) ? r.personel : (r.personel ? [r.personel] : [])).filter(Boolean) : [])])).sort((a,b) => String(a).localeCompare(String(b), 'tr-TR'));
+        let opts = allPersonnel.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+        return renderSearchableDropdownCell("f_personel", "Analizi Yapan Personel", "Personel (Tümü)", opts);
       } else if (f.key === "parti") {
         return `<input type="text" id="f_parti" oninput="applyTableFilters()" placeholder="Parti" class="excel-filter-input">`;
       } else if (f.key === "tur") {
         const opts = (Array.isArray(TUR_LIST) ? TUR_LIST : ["ÜRETİM", "SEVKİYAT", "HAMMADDE", "DOĞRULAMA", "AMBAR TARAMASI", "DIŞ ANALİZ", "MÜŞTERİ"]).map(t => `<option value="${t}">${t}</option>`).join("");
-        return `<select id="f_tur" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_tur", "Numune Türü", "Tümü", opts);
       } else if (f.key === "surec") {
         const opts = (Array.isArray(SUREC_LIST) ? SUREC_LIST : ["DEVAM EDİYOR", "TAMAMLANDI"]).map(s => `<option value="${s}">${s}</option>`).join("");
-        return `<select id="f_surec" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_surec", "Süreç Durumu", "Tümü", opts);
       } else if (f.key === "numuneSahibi") {
         const nsOpts = (typeof NUMUNE_SAHIBI_LIST !== "undefined" && Array.isArray(NUMUNE_SAHIBI_LIST) ? NUMUNE_SAHIBI_LIST : ["FERGO", "FASON"]).map(s => `<option value="${s}">${s}</option>`).join("");
-        return `<select id="f_numune_sahibi" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${nsOpts}</select>`;
+        return renderSearchableDropdownCell("f_numune_sahibi", "Numune Sahibi", "Tümü", nsOpts);
       } else if (f.key === "urunTipi") {
         const utOpts = (typeof URUN_TIPI_LIST !== "undefined" && Array.isArray(URUN_TIPI_LIST) ? URUN_TIPI_LIST : ["GRANÜL", "TOZ", "KRİSTAL", "KATI"]).map(s => `<option value="${s}">${s}</option>`).join("");
-        return `<select id="f_urun_tipi" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${utOpts}</select>`;
+        return renderSearchableDropdownCell("f_urun_tipi", "Ürün Tipi", "Tümü", utOpts);
       } else if (f.key === "firma") {
         return `<input type="text" id="f_firma" oninput="applyTableFilters()" placeholder="Firma" class="excel-filter-input">`;
       } else if (f.key === "aciklama") {
         return `<input type="text" id="f_aciklama" oninput="applyTableFilters()" placeholder="Açıklama" class="excel-filter-input">`;
       } else if (f.key === "uygunluk") {
         const opts = (Array.isArray(UYGUNLUK_LIST) ? UYGUNLUK_LIST : ["UYGUN", "ŞARTLI KABUL"]).map(u => `<option value="${u}">${u}</option>`).join("");
-        return `<select id="f_uygunluk" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option>${opts}</select>`;
+        return renderSearchableDropdownCell("f_uygunluk", "Kalite Uygunluk", "Tümü", opts);
       } 
       // TÜM SAYISAL ELEMENTLER VE PARAMETRELER İÇİN RAHAT VE OKSUZ MİN - MAX ÇİFTİ:
       else if (f.key === "topAzot") {
@@ -28975,8 +29325,8 @@ async function initializeLabErpApp() {
         return `<div class="flex items-center space-x-0.5 w-full justify-center px-0.5"><input type="number" step="any" id="f_${f.key}_min" oninput="applyTableFilters()" placeholder="Min" class="excel-filter-input flex-1 min-w-0" title="Min ${escapeHtml(f.headerLabel || f.label || f.key)}"><span class="text-slate-400 text-[10px] select-none px-0.5">-</span><input type="number" step="any" id="f_${f.key}_max" oninput="applyTableFilters()" placeholder="Max" class="excel-filter-input flex-1 min-w-0" title="Max ${escapeHtml(f.headerLabel || f.label || f.key)}"></div>`;
       } else if (!f.isStandard) {
         if (f.type === "category" && f.options && f.options.length > 0) {
-          const optHtml = `<option value="ALL">Tümü</option>` + f.options.map(o => `<option value="${o}">${o}</option>`).join("");
-          return `<select id="f_${f.key}" onchange="applyTableFilters()" class="excel-filter-input font-medium text-purple-800 bg-purple-50">${optHtml}</select>`;
+          const optHtml = f.options.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+          return renderSearchableDropdownCell(`f_${f.key}`, f.label || f.key, "Tümü", optHtml);
         } else if (f.type === "checkbox") {
           return `<select id="f_${f.key}" onchange="applyTableFilters()" class="excel-filter-input"><option value="ALL">Tümü</option><option value="true">Evet</option><option value="false">Hayır</option></select>`;
         } else if (f.type === "number") {
@@ -32394,6 +32744,12 @@ function closeModal(force = false) {
     }
 
     function openAnalysisMethodsModal() {
+      if (!hasPermission("canManageAnalysisMethods")) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Analiz metotlarını görüntüleme ve düzenleme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.");
+        }
+        return;
+      }
       renderAnalysisMethodsForm();
       const modal = document.getElementById("analysisMethodsModal");
       if (modal) {
@@ -32843,7 +33199,9 @@ function closeModal(force = false) {
 
     
     var returnToEntryModalAfterOfficialReport = false;
+    var returnToResultsModalAfterOfficialReport = false;
     window.returnToEntryModalAfterOfficialReport = false;
+    window.returnToResultsModalAfterOfficialReport = false;
 
     function openOfficialReportFromCurrentModal() {
       let targetId = (typeof currentEditingId !== "undefined") ? currentEditingId : null;
@@ -32870,15 +33228,15 @@ function closeModal(force = false) {
         return;
       }
 
-      // Rapor penceresinin kayıt düzenleme ekranının altında kalmaması için
-      // Kayıt düzenleme modalını geçici olarak gizle ve rapor kapandığında geri aç
+      // 1. Kayıt düzenleme modalını KESİNLİKLE gizle ve dönüş bayrağını ayarla
       returnToEntryModalAfterOfficialReport = true;
       const entryModal = document.getElementById("entryModal");
       if (entryModal) {
         entryModal.classList.add("hidden");
-        entryModal.style.display = "none";
+        entryModal.style.setProperty("display", "none", "important");
       }
 
+      // 2. Resmi analiz raporu modalını aç
       if (typeof openOfficialReportModal === "function") {
         openOfficialReportModal(targetId);
       }
@@ -32888,12 +33246,19 @@ function closeModal(force = false) {
     function openOfficialReportModal(recId) {
       if (!recId) return;
 
-      // Kayıt düzenleme modalı açıksa, raporun arkasında kalmasını önlemek için geçici olarak gizle
+      // Kayıt düzenleme modalı veya sonuç bülteni açıksa, raporun arkada kalmasını kesin olarak önlemek için gizle
       const entryModal = document.getElementById("entryModal");
-      if (entryModal && !entryModal.classList.contains("hidden") && entryModal.style.display !== "none") {
+      if (entryModal && (!entryModal.classList.contains("hidden") || entryModal.style.display !== "none")) {
         returnToEntryModalAfterOfficialReport = true;
         entryModal.classList.add("hidden");
-        entryModal.style.display = "none";
+        entryModal.style.setProperty("display", "none", "important");
+      }
+
+      const resultsModal = document.getElementById("resultsModal");
+      if (resultsModal && (!resultsModal.classList.contains("hidden") || resultsModal.style.display !== "none")) {
+        returnToResultsModalAfterOfficialReport = true;
+        resultsModal.classList.add("hidden");
+        resultsModal.style.setProperty("display", "none", "important");
       }
       const rec = (labRecords || []).find(r => String(r.id) === String(recId)) ||
                   (deletedRecords || []).find(r => String(r.id) === String(recId)) ||
@@ -32932,13 +33297,19 @@ function closeModal(force = false) {
 
       const modal = document.getElementById("officialReportModal");
       if (modal) {
-        // En üst katmanda olmasını garanti etmek için body sonuna taşı ve yüksek z-index ver
+        // En üst katmanda olmasını garanti etmek için body sonuna taşı ve en yüksek z-index ver
         if (modal.parentElement !== document.body) {
           document.body.appendChild(modal);
         }
         modal.classList.remove("hidden");
-        modal.style.display = "flex";
-        modal.style.zIndex = "9999999";
+        modal.style.removeProperty("display");
+        modal.style.setProperty("display", "flex", "important");
+        modal.style.setProperty("z-index", "2147483647", "important");
+        modal.style.setProperty("position", "fixed", "important");
+        modal.style.setProperty("top", "0", "important");
+        modal.style.setProperty("left", "0", "important");
+        modal.style.setProperty("width", "100vw", "important");
+        modal.style.setProperty("height", "100vh", "important");
         if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.scrollTop = 0;
       }
@@ -32948,18 +33319,27 @@ function closeModal(force = false) {
       const modal = document.getElementById("officialReportModal");
       if (modal) {
         modal.classList.add("hidden");
-        modal.style.display = "none";
+        modal.style.setProperty("display", "none", "important");
       }
       document.body.classList.remove("printing-official-report");
 
-      // Eğer kayıt düzenleme ekranından açıldıysa, kayıt ekranını kusursuz şekilde geri getir
+      // Eğer kayıt düzenleme veya sonuç bülteni ekranından açıldıysa, önceki ekranı kusursuz şekilde geri getir
       if (typeof returnToEntryModalAfterOfficialReport !== "undefined" && returnToEntryModalAfterOfficialReport) {
         returnToEntryModalAfterOfficialReport = false;
         const entryModal = document.getElementById("entryModal");
         if (entryModal) {
           entryModal.classList.remove("hidden");
-          entryModal.style.display = "flex";
+          entryModal.style.removeProperty("display");
+          entryModal.style.setProperty("display", "flex", "important");
           entryModal.scrollTop = 0;
+        }
+      } else if (typeof returnToResultsModalAfterOfficialReport !== "undefined" && returnToResultsModalAfterOfficialReport) {
+        returnToResultsModalAfterOfficialReport = false;
+        const resultsModal = document.getElementById("resultsModal");
+        if (resultsModal) {
+          resultsModal.classList.remove("hidden");
+          resultsModal.style.setProperty("display", "flex", "important");
+          resultsModal.scrollTop = 0;
         }
       }
     }
@@ -34672,13 +35052,17 @@ function closeModal(force = false) {
     }
     function getFilterNum(id, defaultVal) {
       const el = document.getElementById(id);
-      if (!el || el.value === "") return defaultVal;
-      const v = parseFloat(el.value);
+      if (!el || el.value === "" || el.value === undefined || el.value === null) return defaultVal;
+      const cleanVal = String(el.value).trim().replace(/\s+/g, "").replace(",", ".");
+      const v = parseFloat(cleanVal);
       return isNaN(v) ? defaultVal : v;
     }
     function setFilterVal(id, val) {
       const el = document.getElementById(id);
       if (el) el.value = val;
+      if (typeof updateDropdownFilterTriggerLabel === "function") {
+        updateDropdownFilterTriggerLabel(id, val);
+      }
     }
 
     
@@ -35176,6 +35560,12 @@ function closeModal(force = false) {
     let pendingImportMappings = {};
 
     function openExcelImportModal() {
+      if (!hasPermission("canImportData")) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Excel dosyası yükleme ve içe aktarma yetkiniz bulunmamaktadır. Yalnızca Excel indirebilirsiniz.");
+        }
+        return;
+      }
       const modal = document.getElementById("excelImportModal");
       if (modal) {
         modal.classList.remove("hidden");
@@ -37501,6 +37891,12 @@ function closeModal(force = false) {
     // ÜRÜN KARTLARI VE STANDART DEĞERLER TABLO YÖNETİMİ
     // ==========================================
     function openProductCardsTableModal() {
+      if (!hasPermission("canManageProductCards")) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Ürün kartlarını görüntüleme ve düzenleme yetkiniz bulunmamaktadır. Yalnızca Sistem Yöneticisi tarafından yetkilendirilen kullanıcılar erişebilir.");
+        }
+        return;
+      }
       try {
         const modal = document.getElementById("productCardsTableModal");
         if (!modal) return;
@@ -37674,8 +38070,132 @@ function closeModal(force = false) {
       openProductCardModal(prod);
     }
 
+    
+    // =============================================================
+    // ÜRÜN KARTLARI NAVİGASYON (ÖNCEKİ / SONRAKİ OKLAR) MOTORU
+    // =============================================================
+    function getAllSortedProductNames() {
+      return Array.from(new Set([
+        ...Object.keys(PRODUCT_CARDS || {}),
+        ...(URUN_LIST || [])
+      ])).filter(Boolean).sort((a, b) => a.localeCompare(b, "tr"));
+    }
+
+    function updateProductCardNavIndicator(index = -1, total = -1) {
+      const allNames = getAllSortedProductNames();
+      const curTotal = (total > 0) ? total : allNames.length;
+      let curIndex = index;
+      const curName = (typeof editingProductOriginalName !== "undefined" && editingProductOriginalName) 
+                      ? editingProductOriginalName 
+                      : (document.getElementById("pc_name")?.value?.trim() || "");
+
+      if (curIndex < 0 && curName) {
+        curIndex = allNames.indexOf(curName);
+        if (curIndex === -1) curIndex = allNames.findIndex(n => n.toLowerCase() === curName.toLowerCase());
+      }
+
+      const ind = document.getElementById("productCardNavIndicator");
+      if (ind) {
+        if (curIndex >= 0) {
+          ind.innerText = `${curIndex + 1} / ${curTotal}`;
+          ind.title = `Ürün ${curIndex + 1} / ${curTotal}: ${allNames[curIndex] || ''}`;
+        } else {
+          ind.innerText = `Yeni / ${curTotal}`;
+          ind.title = "Yeni Ürün Kartı";
+        }
+      }
+
+      const leftBtn = document.getElementById("btnPrevProductCard");
+      const rightBtn = document.getElementById("btnNextProductCard");
+      if (leftBtn) {
+        const prevIdx = (curIndex > 0) ? curIndex - 1 : (curTotal - 1);
+        leftBtn.title = `Önceki Ürün: ${allNames[prevIdx] || ''} (Sol Ok / Alt+Sol)`;
+      }
+      if (rightBtn) {
+        const nextIdx = (curIndex >= 0 && curIndex < curTotal - 1) ? curIndex + 1 : 0;
+        rightBtn.title = `Sonraki Ürün: ${allNames[nextIdx] || ''} (Sağ Ok / Alt+Sağ)`;
+      }
+    }
+    window.updateProductCardNavIndicator = updateProductCardNavIndicator;
+
+    function navProductCard(direction) {
+      const allNames = getAllSortedProductNames();
+      if (allNames.length === 0) {
+        if (typeof showToastNotification === "function") showToastNotification("Kayıtlı ürün kartı bulunmamaktadır.");
+        return;
+      }
+
+      let currentName = (typeof editingProductOriginalName !== "undefined" && editingProductOriginalName) ? editingProductOriginalName : null;
+      const nameInput = document.getElementById("pc_name");
+      if (!currentName && nameInput && nameInput.value.trim()) {
+        currentName = nameInput.value.trim();
+      }
+
+      // Kullanıcı formda değişiklik yaptıysa otomatik kaydet
+      if (typeof isModalDirty === "function" && isModalDirty("productCardModal")) {
+        const validName = nameInput ? nameInput.value.trim() : "";
+        if (validName) {
+          try {
+            if (typeof saveProductCardFromModal === "function") {
+              saveProductCardFromModal(false); // Kaydet ve formda kal
+            }
+            clearModalDirty("productCardModal");
+            currentName = validName;
+          } catch(e) {
+            console.error("navProductCard otomatik kaydetme hatası:", e);
+          }
+        }
+      }
+
+      // Güncellenmiş ürün listesini al
+      const updatedNames = getAllSortedProductNames();
+      let currentIndex = -1;
+      if (currentName) {
+        currentIndex = updatedNames.indexOf(currentName);
+        if (currentIndex === -1) {
+          currentIndex = updatedNames.findIndex(n => n.toLowerCase() === currentName.toLowerCase());
+        }
+      }
+
+      let nextIndex;
+      if (currentIndex === -1) {
+        nextIndex = (direction > 0) ? 0 : updatedNames.length - 1;
+      } else {
+        nextIndex = currentIndex + direction;
+        if (nextIndex >= updatedNames.length) {
+          nextIndex = 0; // Başa dön (döngüsel navigasyon)
+        } else if (nextIndex < 0) {
+          nextIndex = updatedNames.length - 1; // Sona dön
+        }
+      }
+
+      const targetProdName = updatedNames[nextIndex];
+      openProductCardModal(targetProdName);
+      updateProductCardNavIndicator(nextIndex, updatedNames.length);
+
+      if (typeof showToastNotification === "function") {
+        showToastNotification(`[${nextIndex + 1}/${updatedNames.length}] ${targetProdName} ürün kartına geçildi.`);
+      }
+    }
+    window.navProductCard = navProductCard;
+
+    // Klavye kısayolları: Alt+Sol Ok (Önceki), Alt+Sağ Ok (Sonraki)
+    document.addEventListener("keydown", function(e) {
+      const pcModal = document.getElementById("productCardModal");
+      if (!pcModal || pcModal.classList.contains("hidden") || pcModal.style.display === "none") return;
+
+      if ((e.altKey && e.key === "ArrowLeft") || (!["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && e.key === "ArrowLeft")) {
+        e.preventDefault();
+        navProductCard(-1);
+      } else if ((e.altKey && e.key === "ArrowRight") || (!["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) && e.key === "ArrowRight")) {
+        e.preventDefault();
+        navProductCard(1);
+      }
+    });
+
     function openProductCardModal(productName = null) {
       editingProductOriginalName = productName;
+      try { window.editingProductOriginalName = productName; } catch(e){}
       const modal = document.getElementById("productCardModal");
       if (!modal) return;
 
@@ -37686,6 +38206,7 @@ function closeModal(force = false) {
       const foundCard = (typeof getProductCard === "function") ? getProductCard(productName) : (PRODUCT_CARDS ? PRODUCT_CARDS[productName] : null);
       if (productName && foundCard) {
         cardData = JSON.parse(JSON.stringify(foundCard));
+        cardData.name = productName;
         if (titleEl) titleEl.innerText = `Ürün Kartını Düzenle: ${productName}`;
         if (subTitleEl) subTitleEl.innerText = "Mevcut ürünün garanti değerlerini ve azot türevlerini güncelleyin.";
       } else if (productName) {
@@ -37730,6 +38251,7 @@ function closeModal(force = false) {
       modal.classList.remove("hidden");
       if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
+      try { updateProductCardNavIndicator(); } catch(e){}
     }
 
     function closeProductCardModal(force = false) {
@@ -42036,6 +42558,14 @@ function renderCustomFieldsInEntryModal() {
           popover.classList.add("hidden");
         }
       }
+
+      // Tablo Açılır Liste Filtreleme Popover'ını Dışına Tıklayınca Kapat
+      const ddFilterPop = document.getElementById("tableDropdownFilterPopover");
+      if (ddFilterPop && !ddFilterPop.classList.contains("hidden") && ddFilterPop.style.display !== "none") {
+        if (!ddFilterPop.contains(e.target) && !e.target.closest(".custom-searchable-filter-wrapper")) {
+          closeTableDropdownFilterPopover();
+        }
+      }
     });
 
     // Sayfa ve ERP motoru başlatma (tüm tanımlar ve modüller yüklendikten sonra)
@@ -42794,12 +43324,21 @@ function renderCustomFieldsInEntryModal() {
                   </div>
                 </label>
 
-                <!-- 6. canManageBackups -->
+                <!-- 5.1 canManageProductCards -->
                 <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-purple-300 cursor-pointer transition select-none">
-                  <input type="checkbox" id="perm_canManageBackups" onchange="onPermissionCheckboxChange()" class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
+                  <input type="checkbox" id="perm_canManageProductCards" onchange="onPermissionCheckboxChange()" class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
                   <div>
-                    <span class="font-bold text-emerald-800 block text-xs">Veri Güvenliği & Yedek</span>
-                    <span class="text-[10px] text-slate-500 block leading-tight">JSON yedeği alabilir, geri yükleyebilir ve çöpü boşaltabilir</span>
+                    <span class="font-bold text-emerald-800 block text-xs">Ürün Kartları & Spesifikasyonlar</span>
+                    <span class="text-[10px] text-slate-500 block leading-tight">Kayıtlı ürün kartlarını, standart değerleri ve formülleri düzenleyebilir</span>
+                  </div>
+                </label>
+
+                <!-- 5.2 canManageAnalysisMethods -->
+                <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-purple-300 cursor-pointer transition select-none">
+                  <input type="checkbox" id="perm_canManageAnalysisMethods" onchange="onPermissionCheckboxChange()" class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
+                  <div>
+                    <span class="font-bold text-indigo-800 block text-xs">Analiz Metotları Yönetimi</span>
+                    <span class="text-[10px] text-slate-500 block leading-tight">Resmi analiz metotlarını ve standart açıklamalarını güncelleyebilir</span>
                   </div>
                 </label>
 
@@ -42809,6 +43348,24 @@ function renderCustomFieldsInEntryModal() {
                   <div>
                     <span class="font-bold text-slate-800 block text-xs">Excel & Rapor İndirme</span>
                     <span class="text-[10px] text-slate-500 block leading-tight">Şık Excel/CSV indirebilir ve bülten raporu açabilir</span>
+                  </div>
+                </label>
+
+                <!-- 7.1 canImportData -->
+                <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-purple-300 cursor-pointer transition select-none">
+                  <input type="checkbox" id="perm_canImportData" onchange="onPermissionCheckboxChange()" class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
+                  <div>
+                    <span class="font-bold text-emerald-900 block text-xs">Excel'den Veri Yükleme (İçe Aktar)</span>
+                    <span class="text-[10px] text-slate-500 block leading-tight">Excel veya CSV dosyasından sisteme toplu analiz verisi aktarabilir</span>
+                  </div>
+                </label>
+
+                <!-- 6. canManageBackups -->
+                <label class="flex items-start space-x-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl hover:border-purple-300 cursor-pointer transition select-none">
+                  <input type="checkbox" id="perm_canManageBackups" onchange="onPermissionCheckboxChange()" class="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer">
+                  <div>
+                    <span class="font-bold text-emerald-800 block text-xs">Veri Güvenliği & Yedek</span>
+                    <span class="text-[10px] text-slate-500 block leading-tight">JSON yedeği alabilir, geri yükleyebilir ve çöpü boşaltabilir</span>
                   </div>
                 </label>
 
@@ -43266,23 +43823,40 @@ function renderCustomFieldsInEntryModal() {
   </div>
 
   <!-- YENİ GÜBRE / ÜRÜN KARTI VE SPESİFİKASYON TANIMLAMA MODALI -->
-  <div id="productCardModal" class="fixed inset-0 bg-black/60 z-[999999] hidden items-center justify-center p-3 sm:p-4 overflow-y-auto" style="display: none;">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 my-8 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
-      <!-- Header -->
-      <div class="p-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400 text-base shadow-inner">
-            <i class="fa-solid fa-seedling"></i>
+  <div id="productCardModal" class="fixed inset-0 bg-black/60 z-[999999] hidden items-center justify-center p-2 sm:p-4 overflow-y-auto" style="display: none;">
+    <div class="relative flex items-center justify-center w-full max-w-4xl my-auto" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important;">
+      <!-- SOL OK BUTONU (Önceki Ürün Kartı) -->
+      <button type="button" id="btnPrevProductCard" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); navProductCard(-1)" class="flex items-center justify-center w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 shadow-2xl border border-slate-300 transition-all duration-150 transform hover:scale-110 active:scale-95 cursor-pointer z-50 mr-2 sm:mr-4 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 48px !important; height: 48px !important; min-width: 48px !important; min-height: 48px !important; border-radius: 9999px !important; background-color: #ffffff !important;" title="Önceki Ürün Kartı (Sol Ok / Alt+Sol)">
+        <i class="fa-solid fa-chevron-left text-lg sm:text-xl"></i>
+      </button>
+
+      <!-- DİYALOG KART (ORTA) -->
+      <div id="productCardModalDialog" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 my-8 animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="p-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-emerald-400 text-base shadow-inner">
+              <i class="fa-solid fa-seedling"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm sm:text-base leading-tight" id="productCardModalTitle">Yeni Gübre / Ürün Kartı Ekle</h3>
+              <p class="text-xs text-blue-200" id="productCardModalSubTitle">Ürün adını yazdığınızda formül otomatik ayrıştırılır; değerleri ve azot türevlerini dilediğiniz gibi güncelleyebilirsiniz.</p>
+            </div>
           </div>
-          <div>
-            <h3 class="font-bold text-sm sm:text-base leading-tight" id="productCardModalTitle">Yeni Gübre / Ürün Kartı Ekle</h3>
-            <p class="text-xs text-blue-200" id="productCardModalSubTitle">Ürün adını yazdığınızda formül otomatik ayrıştırılır; değerleri ve azot türevlerini dilediğiniz gibi güncelleyebilirsiniz.</p>
+          <div class="flex items-center space-x-1.5">
+            <!-- Header İçi Hızlı Önceki / Sonraki Butonları ve Sıra Göstergesi -->
+            <button type="button" onclick="navProductCard(-1)" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer" title="Önceki Ürün Kartı">
+              <i class="fa-solid fa-chevron-left text-xs"></i>
+            </button>
+            <span id="productCardNavIndicator" class="text-[11px] font-bold text-blue-200 px-1.5 py-0.5 bg-white/10 rounded">1 / 15</span>
+            <button type="button" onclick="navProductCard(1)" class="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer" title="Sonraki Ürün Kartı">
+              <i class="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+            <button type="button" onclick="closeProductCardModal()" class="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition ml-1 cursor-pointer" title="Kapat">
+              <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
           </div>
         </div>
-        <button type="button" onclick="closeProductCardModal()" class="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
 
       <!-- Body (Scrollable) -->
       <div class="p-5 space-y-4 overflow-y-auto flex-1">
@@ -43628,6 +44202,12 @@ function renderCustomFieldsInEntryModal() {
           </button>
         </div>
       </div>
+      </div> <!-- /#productCardModalDialog (Diyalog kartı burada düzgünce kapanır) -->
+
+      <!-- SAĞ OK BUTONU (Sonraki Ürün Kartı - Kartın dışında sağda simetrik) -->
+      <button type="button" id="btnNextProductCard" onmousedown="event.stopPropagation()" onclick="event.stopPropagation(); navProductCard(1)" class="flex items-center justify-center w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 shadow-2xl border border-slate-300 transition-all duration-150 transform hover:scale-110 active:scale-95 cursor-pointer z-50 ml-2 sm:ml-4 shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500" style="display: flex !important; align-items: center !important; justify-content: center !important; width: 48px !important; height: 48px !important; min-width: 48px !important; min-height: 48px !important; border-radius: 9999px !important; background-color: #ffffff !important;" title="Sonraki Ürün Kartı (Sağ Ok / Alt+Sağ)">
+        <i class="fa-solid fa-chevron-right text-lg sm:text-xl"></i>
+      </button>
     </div>
   </div>
 
@@ -68315,7 +68895,15 @@ function renderCustomFieldsInEntryModal() {
     }
   ]
 }
-  </script>
+  
+
+    window.applyTableFilters = applyTableFilters;
+    window.resetAllColumnFilters = resetAllColumnFilters;
+    window.openOfficialReportModal = openOfficialReportModal;
+    window.closeOfficialReportModal = closeOfficialReportModal;
+    window.openOfficialReportFromCurrentModal = openOfficialReportFromCurrentModal;
+
+</script>
 
   <!-- TABLO SATIRI DİĞER İŞLEMLER AÇILIR MENÜSÜ (DROPDOWN POPOVER) -->
   <div id="rowActionMenuPopover" class="fixed bg-white rounded-xl shadow-2xl border border-slate-200 p-1.5 w-52 text-xs hidden animate-in fade-in zoom-in-95 duration-100" style="z-index: 999999 !important;">
@@ -68433,6 +69021,58 @@ function renderCustomFieldsInEntryModal() {
         <i class="fa-solid fa-check text-xs"></i>
         <span>Uygula & Kaydet</span>
       </button>
+    </div>
+  </div>
+
+
+  <!-- ========================================================
+       TABLO AÇILIR LİSTE ARAMALI FİLTRELEME POPOVER'I (SEARCHABLE DROPDOWN POPOVER)
+       ======================================================== -->
+  <div id="tableDropdownFilterPopover" class="fixed bg-white rounded-xl shadow-2xl border border-slate-300 w-64 max-w-[90vw] hidden z-[1000000] overflow-hidden flex-col transition-all duration-150" style="z-index: 1000000; display: none;">
+    <!-- Başlık Çubuğu -->
+    <div class="px-3 py-2 bg-gradient-to-r from-slate-100 to-slate-200 border-b border-slate-300 flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-1.5 min-w-0">
+        <i class="fa-solid fa-filter text-blue-600 text-xs shrink-0"></i>
+        <span class="text-xs font-bold text-slate-800 truncate" id="tableDropdownFilterTitle">Filtrele</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <button type="button" onclick="clearCurrentDropdownFilter()" class="text-[10px] text-rose-600 hover:text-rose-800 font-semibold px-1.5 py-0.5 rounded hover:bg-rose-50 transition cursor-pointer" title="Filtreyi Temizle">
+          Sıfırla
+        </button>
+        <button type="button" onclick="closeTableDropdownFilterPopover()" class="text-slate-400 hover:text-slate-700 p-0.5 rounded hover:bg-slate-300/50 transition cursor-pointer" title="Kapat">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- EN ÜSTTE ARAMA ALANI (AÇILDIĞINDA EN ÜSTTE ARAMA KUTUSU OLSUN) -->
+    <div class="p-2 border-b border-slate-200 bg-slate-50/90 shrink-0">
+      <div class="relative flex items-center">
+        <i class="fa-solid fa-magnifying-glass absolute left-2.5 text-slate-400 text-xs pointer-events-none"></i>
+        <input type="text" 
+               id="tableDropdownFilterSearchInput" 
+               oninput="onTableDropdownFilterSearchInput(this.value)" 
+               onkeydown="onTableDropdownFilterKeyDown(event)"
+               placeholder="Öğelerde ara..." 
+               class="w-full pl-8 pr-7 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+               autocomplete="off">
+        <button type="button" 
+                id="btnClearTableDropdownFilterSearch" 
+                onclick="clearTableDropdownFilterSearch()" 
+                class="hidden absolute right-2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer" 
+                title="Aramayı Temizle">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+      <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1 px-1">
+        <span id="tableDropdownFilterMatchCount">0 seçenek</span>
+        <span class="text-slate-400">Seçmek için tıklayın</span>
+      </div>
+    </div>
+
+    <!-- Arama Sonuçları / Seçenekler Listesi (Kaydırılabilir) -->
+    <div id="tableDropdownFilterOptionsList" class="p-1 max-h-60 overflow-y-auto divide-y divide-slate-100 flex-1">
+      <!-- Dinamik olarak doldurulur -->
     </div>
   </div>
 
