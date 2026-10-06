@@ -364,7 +364,7 @@
     @media print {
       @page {
         size: A4 portrait;
-        margin: 10mm 12mm;
+        margin: 0 !important;
       }
       *, *::before, *::after {
         -webkit-print-color-adjust: exact !important;
@@ -379,8 +379,65 @@
         margin: 0 !important;
         padding: 0 !important;
       }
-      /* Bülten haricindeki tüm üst bar, menü ve modalları tamamen gizle */
-      body > *:not(#resultsModal) {
+      /* Resmi Rapor (F7.8-0-3.00) Yazdırma & PDF Çıktı Yönetimi */
+      body.printing-official-report > *:not(#officialReportModal) {
+        display: none !important;
+      }
+      body.printing-official-report #officialReportModal {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        z-index: auto !important;
+      }
+      body.printing-official-report #officialReportContainer {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body.printing-official-report .official-report-sheet {
+        box-sizing: border-box !important;
+        width: 210mm !important;
+        height: 296mm !important;
+        max-height: 296mm !important;
+        min-height: 296mm !important;
+        padding: 8mm 12mm 8mm 12mm !important;
+        margin: 0 auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: space-between !important;
+        box-shadow: none !important;
+        border: none !important;
+        page-break-before: auto !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+      }
+      body.printing-official-report .official-report-sheet:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      body.printing-official-report table,
+      body.printing-official-report thead,
+      body.printing-official-report tbody,
+      body.printing-official-report tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      body:not(.printing-official-report) > *:not(#resultsModal) {
         display: none !important;
       }
       #resultsModal {
@@ -836,6 +893,35 @@
     .cell-scrollbar::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
     }
+
+    /* ========================================================
+       RESMİ ANALİZ RAPORU (F7.8-0-3.00) ÖNİZLEME STİLLERİ
+       ======================================================== */
+    .official-report-sheet {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 10mm 14mm 12mm 14mm;
+      margin: 0 auto 16px auto;
+      background: #ffffff;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #000;
+      position: relative;
+    }
+    .official-report-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #000;
+    }
+    .official-report-table td, .official-report-table th {
+      border: 1px solid #000;
+      font-size: 8.5pt;
+      vertical-align: middle;
+    }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -967,6 +1053,12 @@
         <button onclick="openProductCardsTableModal()" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded text-[10.5px] font-semibold flex items-center space-x-1 transition cursor-pointer shadow-2xs" title="Kayıtlı Ürün Kartları & Standart Spesifikasyonlar Tablosu">
           <i class="fa-solid fa-boxes-stacked text-emerald-600 text-[10px]"></i>
           <span>Ürün Kartları</span>
+        </button>
+
+        <!-- ANALİZ METOTLARI YÖNETİMİ BUTONU -->
+        <button onclick="openAnalysisMethodsModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-300 px-2 py-0.5 rounded text-[10.5px] font-semibold flex items-center space-x-1 transition cursor-pointer shadow-2xs" title="Resmi Analiz Metotları Yönetimi (F7.1-0-5 Standardı)">
+          <i class="fa-solid fa-flask-vial text-indigo-600 text-[10px]"></i>
+          <span>Analiz Metotları</span>
         </button>
 
         <!-- CANLI BULUT SENKRONİZASYON (DAİRESEL DÖNEN 2 OK ŞEKLİNDE KÜÇÜK BUTON) -->
@@ -3017,7 +3109,134 @@
     </div>
   </div>
 
-    <!-- 2. MODAL: SADECE ANALİZ SONUÇLARINI GÖSTEREN EKRAN / RAPOR -->
+    
+  
+  <!-- ========================================================
+       4. MODAL: RESMİ ANALİZ METOTLARI YÖNETİM MODALI (F7.1-0-5)
+       ======================================================== -->
+  <div id="analysisMethodsModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[10020] flex items-center justify-center p-3 overflow-y-auto hidden">
+    <div class="max-w-3xl w-full bg-white rounded-2xl shadow-2xl border border-slate-300 flex flex-col max-h-[92vh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+      
+      <!-- Modal Başlığı -->
+      <div class="px-6 py-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex justify-between items-center border-b border-slate-700 shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shadow">
+            <i class="fa-solid fa-flask-vial"></i>
+          </div>
+          <div>
+            <h2 class="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <span>Resmi Analiz Metotları Yönetimi</span>
+              <span class="bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 text-[10px] font-bold px-2 py-0.5 rounded-full">F7.1-0-5 Standardı</span>
+            </h2>
+            <p class="text-xs text-slate-300">Resmi analiz raporlarında gösterilen deney metotlarını buradan güncelleyebilirsiniz.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAnalysisMethodsModal()" class="text-slate-400 hover:text-white transition p-1 cursor-pointer">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Bilgilendirme Notu -->
+      <div class="px-6 py-2.5 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between text-xs text-indigo-900">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i>
+          <span>Güncellediğiniz metot isimleri anında kaydedilir ve oluşturacağınız tüm yeni raporlarda bu metotlar görünür.</span>
+        </div>
+        <button type="button" onclick="resetAnalysisMethodsToDefault()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer">
+          Varsayılana Sıfırla
+        </button>
+      </div>
+
+      <!-- Metot Formu / Tablosu -->
+      <div class="p-6 overflow-y-auto flex-1 space-y-4" id="analysisMethodsFormContainer">
+        <!-- Dinamik olarak render edilir -->
+      </div>
+
+      <!-- Modal Butonları -->
+      <div class="px-6 py-3.5 bg-slate-100 border-t border-slate-200 flex justify-between items-center shrink-0">
+        <button type="button" onclick="resetAnalysisMethodsToDefault()" class="px-3.5 py-1.5 bg-white hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition cursor-pointer">
+          <i class="fa-solid fa-rotate-left mr-1 text-slate-500"></i>
+          <span>F7.1-0-5 Standartlarına Sıfırla</span>
+        </button>
+        <div class="flex items-center space-x-2">
+          <button type="button" onclick="closeAnalysisMethodsModal()" class="px-4 py-1.5 bg-white hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition cursor-pointer">
+            İptal
+          </button>
+          <button type="button" onclick="saveAnalysisMethodsForm()" class="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-check"></i>
+            <span>Değişiklikleri Kaydet & Raporlara Uygula</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ========================================================
+       3. MODAL: FERGO RESMİ ANALİZ RAPORU (F7.8-0-3.00) MODALI
+       ======================================================== -->
+  <div id="officialReportModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[10000] flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden">
+    <!-- Üst Kontrol Çubuğu (no-print) -->
+    <div class="sticky top-0 z-50 bg-slate-900/90 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center justify-between gap-4 max-w-4xl w-full mb-4 border border-slate-700 no-print">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow">
+          <i class="fa-solid fa-file-circle-check"></i>
+        </div>
+        <div>
+          <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+            <span>Fergo Analiz Raporu</span>
+            <span class="bg-blue-500/30 text-blue-200 border border-blue-400/40 text-[10px] font-bold px-2 py-0.5 rounded-full">F7.8-0-3.00 Standardı</span>
+          </h2>
+          <p class="text-[10px] text-slate-300" id="officialReportSubtitle">2 Sayfalık Resmi Analiz Sertifikası Önizleme ve Yazdırma Ekranı</p>
+        </div>
+      </div>
+      <!-- Şablon Kontrolleri: Talep Eden & Nihai Baz -->
+      <div class="flex flex-wrap items-center gap-2.5 text-xs">
+        <!-- Talep Eden (Organo Dışı Firma) Seçimi -->
+        <div class="flex items-center gap-1.5 bg-slate-800/90 px-2.5 py-1.5 rounded-lg border border-slate-700 shadow-inner">
+          <label for="reportTalepEdenSelect" class="text-amber-300 font-bold whitespace-nowrap text-[11px] flex items-center gap-1">
+            <i class="fa-solid fa-building text-[10px]"></i>
+            <span>Talep Eden:</span>
+          </label>
+          <select id="reportTalepEdenSelect" onchange="onReportTalepEdenChanged(this.value)" class="bg-slate-900 text-white border border-slate-600 rounded px-2 py-0.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-amber-400 max-w-[200px] cursor-pointer">
+            <option value="">FERGO (Varsayılan)</option>
+          </select>
+        </div>
+
+        <!-- Nihai Sonuç Bazı Seçimi (KURU / YAŞ) -->
+        <div class="flex items-center gap-1.5 bg-slate-800/90 px-2.5 py-1.5 rounded-lg border border-slate-700 shadow-inner">
+          <label for="reportBazSelect" class="text-teal-300 font-bold whitespace-nowrap text-[11px] flex items-center gap-1">
+            <i class="fa-solid fa-scale-balanced text-[10px]"></i>
+            <span>Nihai Baz:</span>
+          </label>
+          <select id="reportBazSelect" onchange="onReportBazChanged(this.value)" class="bg-slate-900 text-white border border-slate-600 rounded px-2 py-0.5 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-teal-400 cursor-pointer">
+            <option value="KURU">KURU BAZ</option>
+            <option value="YAŞ">YAŞ BAZ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button type="button" onclick="openAnalysisMethodsModal()" class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5 cursor-pointer" title="Analiz Metotlarını Düzenle & Güncelle">
+          <i class="fa-solid fa-sliders text-amber-300"></i>
+          <span>Metotları Düzenle</span>
+        </button>
+        <button type="button" onclick="printOfficialReport()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition flex items-center gap-1.5 cursor-pointer">
+          <i class="fa-solid fa-print text-amber-300"></i>
+          <span>Yazdır / PDF Olarak Kaydet</span>
+        </button>
+        <button type="button" onclick="closeOfficialReportModal()" class="text-slate-400 hover:text-white transition p-1 cursor-pointer" title="Kapat">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2 Sayfalık Rapor Konteyneri -->
+    <div id="officialReportContainer" class="w-full flex flex-col items-center">
+      <!-- Dinamik olarak render edilir -->
+    </div>
+  </div>
+
+<!-- 2. MODAL: SADECE ANALİZ SONUÇLARINI GÖSTEREN EKRAN / RAPOR -->
   <div id="resultsModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[9999] flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto hidden">
     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[92vh] my-auto overflow-hidden border border-slate-300" id="printableReport">
       
@@ -3036,9 +3255,13 @@
             <i class="fa-solid fa-copy text-teal-600"></i>
             <span>Kaydı Çoğalt</span>
           </button>
+          <button type="button" onclick="openOfficialReportModal(currentResultsModalRecordId)" class="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded text-xs font-bold border border-blue-400 flex items-center space-x-1.5 shadow-xs transition cursor-pointer" title="Resmi 2 Sayfalık F7.8-0-3.00 Analiz Raporu Çıktısı Al">
+            <i class="fa-solid fa-file-pdf text-amber-300"></i>
+            <span>Resmi Rapor (F7.8-0-3.00)</span>
+          </button>
           <button onclick="window.print()" class="bg-white hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded text-xs font-medium border border-slate-300 flex items-center space-x-1 shadow-2xs cursor-pointer">
             <i class="fa-solid fa-print text-slate-600"></i>
-            <span>Yazdır / PDF</span>
+            <span>Bülten Yazdır</span>
           </button>
           <button onclick="closeResultsModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition p-1 cursor-pointer">
             <i class="fa-solid fa-xmark text-lg"></i>
@@ -4731,6 +4954,35 @@
         </button>
       </div>
 
+    </div>
+  </div>
+
+  
+  <!-- ========================================================
+       KAYDEDİLMEMİŞ DEĞİŞİKLİKLER TEYİT PENCERESİ (UNSAVED CHANGES PROMPT)
+       ======================================================== -->
+  <div id="unsavedChangesConfirmModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[2000000] flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center border border-slate-200">
+      <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-800 mb-2">Kaydedilmemiş Değişiklikler Var</h3>
+      <p class="text-xs text-slate-600 mb-6 leading-relaxed">
+        Yaptığınız değişiklikler henüz kaydedilmedi. Çıkmadan önce bu değişiklikleri kaydetmek istiyor musunuz?
+      </p>
+      <div class="flex flex-col gap-2">
+        <button type="button" id="btnConfirmSaveAndExit" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition text-xs flex items-center justify-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-check"></i>
+          <span>Kaydet ve Çık</span>
+        </button>
+        <button type="button" id="btnConfirmDiscardAndExit" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl border border-rose-200 transition text-xs flex items-center justify-center gap-2 cursor-pointer">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Kaydetmeden Çık</span>
+        </button>
+        <button type="button" id="btnConfirmCancelStay" class="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition text-xs cursor-pointer">
+          <span>Düzenlemeye Devam Et (İptal)</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -11924,6 +12176,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
       populateNewCategoryPositionOptions();
 
       modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
       setTimeout(() => { if (nameInput) nameInput.focus(); }, 100);
     }
@@ -13856,6 +14109,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
       const modal = document.getElementById("modalCloudSyncSettings");
       if (!modal) return;
       modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
 
       // Alanları doldur
@@ -16058,6 +16312,7 @@ Bu role atanmış ${matchingUsers.length} kullanıcının yetkileri de güncel �
       const modal = document.getElementById("roleTemplateModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -20018,7 +20273,12 @@ let genericAppSortState = {};
       }
     }
 
-    function closeGenericAppRecordModal() {
+    function closeGenericAppRecordModal(force = false) {
+      if (!force && isModalDirty("genericAppRecordModal")) {
+        showUnsavedChangesPrompt("genericAppRecordModal");
+        return;
+      }
+      clearModalDirty("genericAppRecordModal");
       const modalEl = document.getElementById("genericAppRecordModal");
       if (modalEl) {
         modalEl.classList.add("hidden");
@@ -20357,6 +20617,7 @@ ${cols.map(c => {
       const modal = document.getElementById("newPodioAppModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -20561,6 +20822,8 @@ ${cols.map(c => {
     const MODAL_BACKDROP_HANDLERS = [
       { id: "entryModal", closeFnName: "closeModal" },
       { id: "resultsModal", closeFnName: "closeResultsModal" },
+        { id: "officialReportModal", closeFnName: "closeOfficialReportModal" },
+        { id: "analysisMethodsModal", closeFnName: "closeAnalysisMethodsModal" },
       { id: "columnManagerModal", closeFnName: "closeColumnVisibilityModal" },
       { id: "masterDataModal", closeFnName: "closeMasterDataModal" },
       { id: "backupRestoreModal", closeFnName: "closeBackupRestoreModal" },
@@ -20583,28 +20846,165 @@ ${cols.map(c => {
       { id: "productCardsTableModal", closeFnName: "closeProductCardsTableModal" }
     ];
 
+    // ========================================================
+    // MODAL DEĞİŞİKLİK (DIRTY) VE DIŞINA TIKLAYARAK GÜVENLİ KAPATMA SİSTEMİ
+    // ========================================================
+    const MODAL_DIRTY_FLAGS = {};
+
+    function markModalDirty(modalId) {
+      MODAL_DIRTY_FLAGS[modalId] = true;
+    }
+
+    function clearModalDirty(modalId) {
+      MODAL_DIRTY_FLAGS[modalId] = false;
+    }
+
+    function isModalDirty(modalId) {
+      return !!MODAL_DIRTY_FLAGS[modalId];
+    }
+
+    // Modal içerisindeki herhangi bir girdi değiştiğinde kirli (dirty) olarak işaretle
+    document.addEventListener("input", function(e) {
+      const modal = e.target.closest(".fixed.inset-0");
+      if (modal && modal.id && modal.id !== "unsavedChangesConfirmModal") {
+        MODAL_DIRTY_FLAGS[modal.id] = true;
+      }
+    }, true);
+
+    document.addEventListener("change", function(e) {
+      const modal = e.target.closest(".fixed.inset-0");
+      if (modal && modal.id && modal.id !== "unsavedChangesConfirmModal") {
+        MODAL_DIRTY_FLAGS[modal.id] = true;
+      }
+    }, true);
+
+    const EDITABLE_MODAL_HANDLERS = {
+      "entryModal": {
+        save: () => { if (typeof saveModalForm === "function") saveModalForm(false); },
+        close: () => { if (typeof closeModal === "function") closeModal(true); }
+      },
+      "productCardModal": {
+        save: () => { if (typeof saveProductCard === "function") saveProductCard(); },
+        close: () => { if (typeof closeProductCardModal === "function") closeProductCardModal(true); }
+      },
+      "analysisMethodsModal": {
+        save: () => { if (typeof saveOfficialMethodsFromModal === "function") saveOfficialMethodsFromModal(); },
+        close: () => { if (typeof closeAnalysisMethodsModal === "function") closeAnalysisMethodsModal(true); }
+      },
+      "genericAppRecordModal": {
+        save: () => { if (typeof saveGenericAppRecord === "function") saveGenericAppRecord(); },
+        close: () => { if (typeof closeGenericAppRecordModal === "function") closeGenericAppRecordModal(true); }
+      }
+    };
+
+    function showUnsavedChangesPrompt(modalId, onSaveSuccess = null) {
+      const confirmModal = document.getElementById("unsavedChangesConfirmModal");
+      if (!confirmModal) return;
+
+      const handler = EDITABLE_MODAL_HANDLERS[modalId];
+      const btnSave = document.getElementById("btnConfirmSaveAndExit");
+      const btnDiscard = document.getElementById("btnConfirmDiscardAndExit");
+      const btnCancel = document.getElementById("btnConfirmCancelStay");
+
+      const cleanup = () => {
+        confirmModal.classList.add("hidden");
+        confirmModal.style.display = "none";
+        btnSave.onclick = null;
+        btnDiscard.onclick = null;
+        btnCancel.onclick = null;
+      };
+
+      btnSave.onclick = () => {
+        cleanup();
+        if (handler && typeof handler.save === "function") {
+          handler.save();
+        }
+        clearModalDirty(modalId);
+        if (typeof onSaveSuccess === "function") onSaveSuccess();
+      };
+
+      btnDiscard.onclick = () => {
+        cleanup();
+        clearModalDirty(modalId);
+        if (handler && typeof handler.close === "function") {
+          handler.close();
+        } else {
+          const el = document.getElementById(modalId);
+          if (el) { el.classList.add("hidden"); el.style.display = "none"; }
+        }
+      };
+
+      btnCancel.onclick = () => {
+        cleanup();
+      };
+
+      confirmModal.classList.remove("hidden");
+      confirmModal.style.display = "flex";
+    }
+
+    function isClickInsideDialogCard(modalEl, target) {
+      if (!modalEl || !target) return false;
+      if (target.closest("#fieldConfigPopover, #userMenuDropdown, #excelExportDropdownMenu, .podio-color-popover, .podio-field-dropdown, #unsavedChangesConfirmModal, .flatpickr-calendar, datalist")) {
+        return true;
+      }
+      if (modalEl.id === "entryModal") {
+        const dialog = document.getElementById("entryModalDialog");
+        return dialog ? dialog.contains(target) : false;
+      }
+      if (modalEl.id === "officialReportModal") {
+        const topBar = modalEl.querySelector(".sticky.top-0");
+        const sheets = modalEl.querySelectorAll(".official-report-sheet");
+        if (topBar && topBar.contains(target)) return true;
+        for (const sheet of sheets) {
+          if (sheet.contains(target)) return true;
+        }
+        return false;
+      }
+      if (modalEl.id === "resultsModal") {
+        const report = document.getElementById("printableReport");
+        return report ? report.contains(target) : false;
+      }
+      const dialogCard = modalEl.querySelector(".bg-white.rounded-xl, .bg-white.rounded-2xl, [role='dialog'], form") || modalEl.firstElementChild;
+      if (dialogCard && dialogCard.contains(target)) {
+        return true;
+      }
+      return false;
+    }
+
+    function attemptCloseModal(item) {
+      const modalEl = document.getElementById(item.id);
+      if (!modalEl) return;
+
+      const isEditable = EDITABLE_MODAL_HANDLERS[item.id];
+      if (isEditable && isModalDirty(item.id)) {
+        showUnsavedChangesPrompt(item.id);
+        return;
+      }
+
+      clearModalDirty(item.id);
+      const fn = window[item.closeFnName] || (typeof eval !== "undefined" ? (() => { try { return eval(item.closeFnName); } catch(e){ return null; } })() : null);
+      if (typeof fn === "function") {
+        fn();
+      } else {
+        modalEl.classList.add("hidden");
+        modalEl.style.display = "none";
+      }
+    }
+
     function setupModalBackdropCloseHandlers() {
       MODAL_BACKDROP_HANDLERS.forEach(item => {
         const modalEl = document.getElementById(item.id);
         if (!modalEl) return;
 
-        let mDownTarget = null;
+        let mDownInside = false;
         modalEl.addEventListener("mousedown", function(e) {
-          mDownTarget = e.target;
+          mDownInside = isClickInsideDialogCard(modalEl, e.target);
         });
 
         modalEl.addEventListener("click", function(e) {
-          // SADECE doğrudan modalEl zeminine tıklandıysa kapat (iç karttaki elemanlar tıklandıysa asla kapatma!)
-          if (e.target !== modalEl || mDownTarget !== modalEl) {
-            return;
-          }
-
-          if (typeof window[item.closeFnName] === "function") {
-            window[item.closeFnName]();
-          } else {
-            modalEl.classList.add("hidden");
-            modalEl.style.display = "none";
-          }
+          if (mDownInside) return;
+          if (isClickInsideDialogCard(modalEl, e.target)) return;
+          attemptCloseModal(item);
         });
       });
     }
@@ -23338,7 +23738,9 @@ async function initializeLabErpApp() {
 
       // SAYFA YENİLENDİĞİNDE AKTİF SEÇİLİ APLİKASYONUN EKRANINI DOĞRUDAN GÖSTER
       try {
+        restoreActiveTableFilters();
         switchPodioWorkspaceApp(activeWorkspaceAppId, true);
+        applyTableFilters();
       } catch(e) {
         console.error("switchPodioWorkspaceApp init error:", e);
       }
@@ -23865,6 +24267,7 @@ async function initializeLabErpApp() {
       const modal = document.getElementById("sidebarFacetModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
         setTimeout(() => document.getElementById("facetModalLabel")?.focus(), 50);
       }
@@ -23913,6 +24316,7 @@ async function initializeLabErpApp() {
       const modal = document.getElementById("sidebarFacetModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -24778,6 +25182,7 @@ async function initializeLabErpApp() {
       const modal = document.getElementById("rawMaterialsConfigModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
         if (focusKey === "vinas") {
           const el = document.getElementById("cfg_raw_vinas_k2o");
@@ -25421,6 +25826,7 @@ async function initializeLabErpApp() {
       }
 
       modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
       setTimeout(() => { if (titleInput) titleInput.focus(); }, 50);
     }
@@ -25777,6 +26183,7 @@ async function initializeLabErpApp() {
       renderCustomizerColumnsList(facetId, name);
 
       modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
     }
 
@@ -26235,6 +26642,7 @@ async function initializeLabErpApp() {
       const modal = document.getElementById("liveHiddenFieldsModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
       if (typeof renderModifierHiddenFieldsList === "function") {
@@ -26794,6 +27202,7 @@ async function initializeLabErpApp() {
         const modal = document.getElementById("columnManagerModal");
         if (modal) {
           modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
           modal.style.display = "flex";
         }
         return;
@@ -26803,6 +27212,7 @@ async function initializeLabErpApp() {
       const modal = document.getElementById("columnManagerModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -29151,20 +29561,21 @@ async function initializeLabErpApp() {
       } else if (k === "nem") {
         const nemDec = getFieldDecimals("nem");
         const rawNem = (row.nem !== undefined && row.nem !== null && row.nem !== "") ? row.nem : (row.entered_yas?.nem ?? null);
-        const nemNum = rawNem !== null ? parseTRNumber(rawNem) : null;
-        const nemVal = (nemNum !== null && !isNaN(nemNum)) ? formatTRNumber(nemNum, nemDec) : "";
+        const nemNum = (rawNem !== null && rawNem !== undefined && rawNem !== "" && !isNaN(parseFloat(rawNem))) ? parseTRNumber(rawNem) : null;
+        const nemVal = (nemNum !== null && !isNaN(nemNum) && nemNum > 0) ? formatTRNumber(nemNum, nemDec) : "";
         return `
-          <td class="py-1 px-1 border-r border-slate-200 text-center font-semibold text-slate-800 text-xs select-none bg-slate-50/30 ${colClass}" title="Nem değeri tablodan düzenlenemez">
-            ${nemVal !== "" ? `%${nemVal}` : '<span class="text-slate-300 font-normal">-</span>'}
+          <td class="py-1 px-1 border-r border-slate-200 text-center font-semibold text-slate-800 text-xs select-none bg-slate-50/30 ${colClass}" title="${nemVal ? 'Nem: %' + nemVal : 'Nem değeri girilmedi'}">
+            ${(nemVal !== "" && nemNum > 0) ? `%${nemVal}` : '<span class="text-slate-300 font-normal">-</span>'}
           </td>
         `;
       } else if (k === "km") {
         const kmVal = (row.km !== undefined && row.km !== null && row.km !== "") ? row.km : (row.entered_yas?.km ?? null);
-        const numKM = kmVal !== null ? parseTRNumber(kmVal) : null;
+        const numKM = (kmVal !== null && kmVal !== undefined && kmVal !== "" && !isNaN(parseFloat(kmVal))) ? parseTRNumber(kmVal) : null;
         const dec = getFieldDecimals("km");
+        const hasNem = (row.nem !== undefined && row.nem !== null && row.nem !== "" && parseFloat(row.nem) > 0);
         return `
           <td class="py-1 px-1 border-r border-slate-200 text-center font-bold text-teal-950 text-xs bg-teal-50/20 ${colClass}">
-            ${(numKM !== null && !isNaN(numKM) && numKM > 0) ? `%${formatTRNumber(numKM, dec)}` : "-"}
+            ${(hasNem && numKM !== null && !isNaN(numKM) && numKM > 0 && numKM < 100) ? `%${formatTRNumber(numKM, dec)}` : '<span class="text-slate-300 font-normal">-</span>'}
           </td>
         `;
       } else if (k === "om") {
@@ -30533,6 +30944,7 @@ function refreshModalNihaiOutputs() {
 
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -31410,7 +31822,12 @@ function refreshModalNihaiOutputs() {
       }
     }
 
-function closeModal() {
+function closeModal(force = false) {
+      if (!force && isModalDirty("entryModal")) {
+        showUnsavedChangesPrompt("entryModal");
+        return;
+      }
+      clearModalDirty("entryModal");
       if (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
         if (typeof closeTableModifierModal === "function") {
           closeTableModifierModal();
@@ -31890,7 +32307,905 @@ function closeModal() {
 
     let currentResultsModalRecordId = null;
 
-    function viewResultsModal(id) {
+    
+    
+    // ========================================================
+    // ANALİZ METOTLARI YÖNETİM FONKSİYONLARI (F7.1-0-5)
+    // ========================================================
+    function getOfficialMethods() {
+      try {
+        const saved = SafeStorage.getItem("LAB_ERP_ANALYSIS_METHODS");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error("getOfficialMethods error:", e);
+      }
+      return {};
+    }
+
+    function saveOfficialMethods(methods) {
+      try {
+        SafeStorage.setItem("LAB_ERP_ANALYSIS_METHODS", JSON.stringify(methods));
+        if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified();
+        if (typeof triggerCloudSyncImmediate === "function") triggerCloudSyncImmediate("analysisMethods");
+      } catch (e) {
+        console.error("saveOfficialMethods error:", e);
+      }
+    }
+
+    function openAnalysisMethodsModal() {
+      renderAnalysisMethodsForm();
+      const modal = document.getElementById("analysisMethodsModal");
+      if (modal) {
+        modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
+        modal.scrollTop = 0;
+      }
+    }
+
+    function closeAnalysisMethodsModal(force = false) {
+      if (!force && isModalDirty("analysisMethodsModal")) {
+        showUnsavedChangesPrompt("analysisMethodsModal");
+        return;
+      }
+      clearModalDirty("analysisMethodsModal");
+      const modal = document.getElementById("analysisMethodsModal");
+      if (modal) modal.classList.add("hidden");
+    }
+
+    function renderAnalysisMethodsForm() {
+      const container = document.getElementById("analysisMethodsFormContainer");
+      if (!container) return;
+
+      const customMethods = getOfficialMethods();
+
+      const items = [
+        { key: "nem", name: "Nem Tayini", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["nem"].method },
+        { key: "om", name: "Organik Madde", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["om"].method },
+        { key: "thf_kati", name: "Toplam Hümik Fulvik Asit (Katı Ürünlerde)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["thf"].methodKatı },
+        { key: "thf_sivi", name: "Toplam Hümik Asit (Sıvı Ürünlerde)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["thf"].methodSıvı },
+        { key: "ph", name: "pH Tayini", unit: "-", default: OFFICIAL_PARAMETER_CONFIGS["ph"].method },
+        { key: "ec", name: "EC Tayini", unit: "mS/cm", default: OFFICIAL_PARAMETER_CONFIGS["ec"].method },
+        { key: "yogunluk", name: "Yoğunluk", unit: "g/cm³", default: OFFICIAL_PARAMETER_CONFIGS["yogunluk"].method },
+        { key: "topAzot", name: "Toplam Azot", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["topAzot"].method },
+        { key: "tkn", name: "Toplam Kjeldahl Azotu", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["tkn"].method },
+        { key: "nh4N", name: "Amonyum Azotu (NH4-N)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["nh4N"].method },
+        { key: "no3N", name: "Nitrat Azotu (NO3-N)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["no3N"].method },
+        { key: "ureN", name: "ÜRE Azotu (NH2-N)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["ureN"].method },
+        { key: "topP2O5", name: "Toplam P2O5", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["topP2O5"].method },
+        { key: "sudaP2O5", name: "Suda Çözünür P2O5", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaP2O5"].method },
+        { key: "topK2O", name: "Toplam K2O", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["topK2O"].method },
+        { key: "sudaK2O", name: "Suda Çözünür K2O", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaK2O"].method },
+        { key: "topSO3", name: "Toplam SO3", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["topSO3"].method },
+        { key: "sudaSO3", name: "Suda Çözünür SO3", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaSO3"].method },
+        { key: "zn", name: "Çinko (Zn) / Mikro Elementler", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["zn"].method },
+        { key: "b", name: "Toplam Bor (B)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["b"].method },
+        { key: "ca", name: "Toplam Kalsiyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["ca"].method },
+        { key: "sudaCa", name: "Suda Çözünür Kalsiyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaCa"].method },
+        { key: "mg", name: "Toplam Magnezyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["mg"].method },
+        { key: "sudaMg", name: "Suda Çözünür Magnezyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaMg"].method },
+        { key: "na", name: "Toplam Sodyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["na"].method },
+        { key: "sudaNa", name: "Suda Çözünür Sodyum", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["sudaNa"].method },
+        { key: "elek_gt4", name: "Elek Analizi (>4 mm)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["elek_gt4"].method },
+        { key: "elek_lt2", name: "Elek Analizi (<2 mm)", unit: "%", default: OFFICIAL_PARAMETER_CONFIGS["elek_lt2"].method }
+      ];
+
+      let rowsHtml = items.map((item, idx) => {
+        const currentVal = customMethods[item.key] !== undefined ? customMethods[item.key] : item.default;
+        return `
+          <tr class="border-b border-slate-200 hover:bg-slate-50/70 transition">
+            <td class="py-2.5 px-3 font-semibold text-slate-800 text-xs">${idx + 1}</td>
+            <td class="py-2.5 px-3 font-bold text-slate-900 text-xs">${escapeHtml(item.name)}</td>
+            <td class="py-2.5 px-3 text-center text-slate-600 text-xs font-mono">${escapeHtml(item.unit)}</td>
+            <td class="py-2.5 px-3">
+              <input type="text" id="method_input_${item.key}" value="${escapeHtml(currentVal)}" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium" placeholder="Standart metot adı...">
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      container.innerHTML = `
+        <table class="w-full text-left border-collapse border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700 text-xs font-bold border-b border-slate-200">
+              <th class="py-2.5 px-3 w-10">#</th>
+              <th class="py-2.5 px-3 w-56">Parametre Adı</th>
+              <th class="py-2.5 px-3 w-16 text-center">Birim</th>
+              <th class="py-2.5 px-3">Standart Analiz Metodu</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function saveAnalysisMethodsForm() {
+      const keys = [
+        "nem", "om", "thf_kati", "thf_sivi", "ph", "ec", "yogunluk", 
+        "topAzot", "tkn", "nh4N", "no3N", "ureN", "topP2O5", "sudaP2O5", 
+        "topK2O", "sudaK2O", "topSO3", "sudaSO3", "zn", "b", "ca", 
+        "sudaCa", "mg", "sudaMg", "na", "sudaNa", "elek_gt4", "elek_lt2"
+      ];
+
+      const methods = getOfficialMethods();
+      keys.forEach(k => {
+        const inp = document.getElementById("method_input_" + k);
+        if (inp) {
+          if (inp && inp.value !== undefined) { methods[k] = String(inp.value).trim(); }
+        }
+      });
+
+      saveOfficialMethods(methods);
+      closeAnalysisMethodsModal();
+
+      // Eğer şu anda resmi rapor açıksa anında yeniden render et
+      if (currentOfficialReportRecordId) {
+        const rec = (labRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                    (deletedRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                    (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(currentOfficialReportRecordId)) : null);
+        if (rec) renderOfficialReportDOM(rec);
+      }
+
+      if (typeof showToastNotification === "function") {
+        showToastNotification("Analiz metotları başarıyla güncellendi.");
+      }
+    }
+
+    function resetAnalysisMethodsToDefault() {
+      if (!confirm("Tüm analiz metotlarını F7.1-0-5 Analiz Hizmet Kapsamı resmi standartlarına sıfırlamak istediğinize emin misiniz?")) {
+        return;
+      }
+      SafeStorage.removeItem("LAB_ERP_ANALYSIS_METHODS");
+      renderAnalysisMethodsForm();
+
+      if (currentOfficialReportRecordId) {
+        const rec = (labRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                    (deletedRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                    (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(currentOfficialReportRecordId)) : null);
+        if (rec) renderOfficialReportDOM(rec);
+      }
+
+      if (typeof showToastNotification === "function") {
+        showToastNotification("Analiz metotları resmi varsayılanlara sıfırlandı.");
+      }
+    }
+
+
+    // ========================================================
+    // FERGO RESMİ ANALİZ RAPORU (F7.8-0-3.00) MOTORU
+    // ========================================================
+    const FERGO_LOGO_B64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAEZBAwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KKKKACiiigAooooAKKKKACiimySKi8kD60m0ldgDDBpCAqnNed/EX9pPw/4BEkCzf2nqCcGC3IIU+jN0X9T7V4T4/8A2ovE/jLzI7e4GkWjceXakhyPeT735Y+lfkHGPjXw3kDlRlV9tVX2YWdn2b2X5rsfR5ZwrjsalOMeWPeWn3Ld/kfTniz4laF4JhzqeqWloxGQjP8AOw9lHzH8BXmPiv8Abb0PS98el6fe6m46O2IYj+Jy3/jtfNV1O90zSSu8sjnczOdzMfUk1Xk7fSv5w4h+kvn2Lk4ZZTjQj0dueX3vT8D7zA8A4Omk8TJyf3L8NfxPW/Ef7avim/LLY2+m6ch6YQyyD8WOP/Ha4jW/2ifGutFvN8QXqA9odsOP++AK5WXpVSX+tflOZeJHE2Pu8Tjajv0Uml9ysj6fDcP5dRX7ujH7k397uzRvPHuu37Hz9a1WXI/ju5D/ADNZN3qt1NkvdXDn/akJpW6n6VXl+61fMVMfia3vVakpPzbf5nqwoUoK0IpfIab2Yk/vpen981DJeTKG/fS/99mnev0FQy/daojVnfdmnKrDJ7yZVz50uf8AfNVJNQuOf30v/fZqe4+5VOToa6adSdt2NJA1/O2czS8f7ZqBr+cD/Xzf99mlH8VQP901r7SfctJA1/O279/N/wB9mo5L+cD/AF83P+2aQfxVHJ2rVVJ92bcqtsJNfTgH9/N/32arzajcAf6+b/vs0+XvVeftWqqT7sfIuw2a/n5/fzf99moJL+44/wBIn/7+GnTfdqCTtWsas+7K5V2B7+4wf9In4/6aGq02o3Cv/wAfE/8A32alk+434VUm+/XTCpLuUorsLJqNxgn7RPwP+ehqvJqdyCP9In/7+GnSfdP0qu/WtVUl3BxXYVtTuSH/ANIn4/6aGoW1K53D/SJ/+/hoPR6gb74raFSXc25I9hz39xtJ+0T9P+ehqu+pXOf+Pif/AL+Gnv8AcP0qs/WtVUl3EorQVtSucr/pE/P/AE0Nfb3/AASHilm0XxtcvJJIkk9pGCzE4KrKT/6EK+G2++lfob/wSe8MtpfwA1O/dcHVNXldD6oiRoP/AB4PX674KUJ1uKKU09IRk391vzZ8V4g1Iwyicf5nFfin+h9TUUUV/bh+AhRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUANfn60jEAHPHvS9Ac1518ZPjtafDuFrS12XeqyL8seflhBHDP/h1PsOa8HiHiTL8kwUswzKooU49+r7JdW/I6cHgq2KqqjQjeT/rU6Xx18RtL+Helm51K5VCf9XEvMkp9FHf+Q7mvnH4q/tF6z4+863tmfS9NOR5UT/vJB/tt/QYH1rlfEviO+8V6tLfahcyXNzJ1Zjwo9AOgHsKyJ/uNX8F+JPjzm+f1JYTLW6GG2snaUl/ea2T7L8T9eyLg/DYNKriPfqfgvRfqym/SoJOhqd/umoJOhr8MTbd2fYoa/wDq6hk7fSpn/wBXUMnb6VqaEMvSqkv9aty9KqS/1q1sVEjbqfpVeX7rVYbqfpVeX7rVtDYt7kPr9BUMv3Wqb1+gqGX7rVotw6EFx9yqcnQ1cuPuVTk6GuqlsC3IR/FUD/dNTj+KoH+6a1LIh/FUcnapB/FUcnatVubrYhl71Xn7VYl71Xn7VrEZBN92oJO1TzfdqCTtWkQI5PuN+FVJvv1bk+434VUm+/XVAtbEUn3T9Krv1qxJ90/Sq79a1W4PYiPR6gb74qc9HqBvvitqZv0GP9w/Sqz9asv9w/Sqz9a1JXQhc4Za/Wn9kT4fN8MP2c/CmkyxmK4SxS4nUjlZZcyuD7hnI/Cvzc/ZU+Ej/Gr49eHtEaIyWfni6vuOBbxfO4PpuwFHu4r9aoo/LiRPQYr+oPo+ZFJLEZtNaaQj+cv0PyTxPzBN0sFF7e8/yX6klFFFf04fkwUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFGc0UAFFFFABRRRQA3aOtJ0P0pRjgetcj8XviTH8OfDjTZVr2fKW0Z/ibHU+w6n8B3ryM7znCZTgamYY2XLTpptv+ur2S7m2Gw1SvVjRpK8nojD+OfxrTwDZnT7B1k1e4XPqLdT/ABEevoPxPHX5rvLuW/vZZ55Hllmcu7ucsxPUk1d1fUZ9Y1Ka6upGnuJ3LyO3Viazv4j9a/zP8TPEvHcW5k69RuNCF1CF9Eu77yfU/cuH8jo5fQ5VrN/E+/8AwERv3qtP9xqsv3qtP9xq/Nj6Apv901BJ0NTv901BJ0NdUQGv/q6hk7fSpn/1dQydvpWxoQy9KqS/1q3L0qpL/WrWxUSNup+lV5futVhup+lV5futW0Ni3uQ+v0FQy/dapvX6CoZfutWi3DoQXH3KpydDVy4+5VOToa6qWwLchH8VQP8AdNTj+KoH+6a1LIh/FUcnapB/FUcnatVubrYhl71Xn7VYl71Xn7VrEZBN92oJO1TzfdqCTtWkQI5PuN+FVJvv1bk+434VUm+/XVAtbEUn3T9Krv1qxJ90/Sq79a1W4PYiPR6gb74qc9HqBvvitqZv0GP9w/Sqr8GrT/cP0r0r9kf9nK6/aO+LNtp7JImiWBW51SdeNkQPEYP99yNo9BuP8Nevk+VYjMcZTwWFjzTm0kv66Lds48bjKWEoSxFZ2jFXf9fkfVX/AAS6+AT+C/h7c+NNQh2X/iMCOzDDDR2ang/9tGG73Coe9fV5G01U0rTLfRdOt7O1ijt7a2jWKGOMbVRVAAUDsAABVoY4r/QjhXIKWS5ZSy+jtFavvJ7v5s/mfOMynj8XPFVN5Pbsui+SH0UUV9EeaFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRQelADc/LXN/E34s+G/gz4Rude8V67pfh/RrQZmvL+5SCJCegyxGSewHJ7CpPif8RdL+EXw81vxPrc4tNI8P2M2oXsxGfLiiQuxA7nAOB3Nfij8PPD3xG/4L8/tj6lda7qt74f8Ahr4WYTvbxPvi0e1diIoIlPytdShTukYfwsfuqqV4WcZu8I4UaMeerPSK/Nt9EjxM2zZ4VxoUo81Wey/V+SPtn4q/8HFHwC8BapLaaQnjHxgY2K+fpmmJHASP9q4kibHuFNYnhD/g5P8AgjrepR2+p+HfiFokbnBuJbG2mijHq3lzs/5Ka8a+LP7VfwI/4JZftCav8KPD37N2k+KtS8Praodcur2K4v79preKb70tvI4P7zGFYLkcAdBY0P8A4K0/s3fH7xRB4V+L37P2n+ErHUGWEahc2NtdpZbuA7sIopol/wBuMEj9a+YeeYlVHCeKhGadnHldk+13+Z8487xKm4TxMIzTs48rsn2uz9H/ANnH9r74b/tXeH31HwB4u0rxFDCAZ4YnMd1a56ebA4WSPPbcoz2r05uvavxa/wCCjf8AwTk1X/gmfr+l/Hf4Ca7rGmeHbO6j+0Qx3Blk0YyMAhDnPnWkhIQrJu5ZQS4bj9If+Cdn7c+l/ts/st6N4zm+z6frMcj6brNohOy3vYgpfZk/cdXSRQSSFkUEkg172X57KVaWEx8VCpFX/utd0e7l2dSlVlhMbFQqRV/7rXdH0NRRRX0x9CFFFFAFa/vYtOtZJ5nWOKJS7ueigDJJr5V+KHj2b4g+LJ71iwt0Oy3jP8CDp+J6n6167+0543OkeH4tIgfbNqHMuDyIl7fiePoDXgJ6mv4a+k14gTxGNjw1hJe5Ts6lusmrpPyS19X5H6fwRlCjTeOqLV6R9Or+ZDJ94/Wqp+8frVqT7x+tVT94/Wv5Ppn6PDYjfvVaf7jVZfvVaf7jVqUU3+6agk6Gp3+6agk6GuqIDX/1dQydvpUz/wCrqGTt9K2NCGXpVSX+tW5elVJf61a2KiRt1P0qvL91qsN1P0qvL91q2hsW9yH1+gqGX7rVN6/QVDL91q0W4dCC4+5VOToauXH3KpydDXVS2BbkI/iqB/umpx/FUD/dNalkQ/iqOTtUg/iqOTtWq3N1sQy96rz9qsS96rz9q1iMgm+7UEnap5vu1BJ2rSIEcn3G/Cqk336tyfcb8KqTffrqgWtiKT7p+lV361Yk+6fpVd+tarcGRHo9QN98VOej1peBfAGr/E7xZaaLodlLfajdttjjQdB3Zj0VR1JPArsweHq16io0YuUpNJJK7beySLq1YUqbnUdktW30E+Hnw81b4qeMLLQNEtXu9R1B9kaj7qDu7HsqjknsK/UP9mv9nvS/2dPhta6LYhZrp/31/dbcNdTn7zeyjoo7ADvknn/2SP2S9M/Zr8K7pPKvvEeoIDfXwXp38qPPIjB/FiMnsB7J1r+0/Cjw1jkVD6/j0niZrbfkT6LzfV/I/BuMeK3mNT6vh3+6i/8AwJ9/Tsh9FFFftB8MFFFFABRRRQAUUUUAFFFGaACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoozRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQB8s/wDBaV75P+CZ3xSOn7/O+yW3mbevk/bIPN/DZuz7ZrwD/g2hXTR+yV41MHl/2qfFbi7x9/y/slv5WfbPmY993vX6AfFj4aaV8Zfhtr/hTW4ftGkeIrCbTryPoWilQo2D2ODkHsQDX4ofB3x38Qv+CBv7ZmraT4q0m/1v4e+JmEUk1uu2PVrZGJiu4GPyi4jDENGSPvspIBV6+LzlvB5rRzGqv3dnFv8Alb6/ifH5u/quaUcfVXuWcW/5W9n+Jl/8FPNf8SeFf+C3eo6n4P0+LVvFdhrGhz6RZSxmRLu7WztDFGVDKSGcAY3Dr1Fcn8ffGPxc/wCCm37cfhH4dfE2Dwx4C8W2cp0NYWsntIrPd++bflpHd2GNi7trEqFxuJP3b4Y+Bv7OP7cX7Z2mftCaD8a418QQ6jp2q/8ACPyz21q8clokKLG8MwEwB8oZI4yTgkYrpP8Agor+xR8A/i/8Z7D4s+JPjDa/DPX9Jt4Q1zY6laRvcyQNuhmCvl2lUbVGwEkIgxxXzlbJa1VVa8aicJT5uVSVnG9736M+fq5NVqqrXVROEp83LdWcb3vfoz3H9v8A8I6L4G/4JifEfRb5vN03R/Bc9lbvcHLPJHbbLck/3vNWPHvivxN/Y9vfiTb/AA0v18HHUP7MOqSGXyCdvneVDnPvt2fpX01/wUn/AOCl2sf8FE7nSPgR8ErDWfEml31xEt/fpamGbxJNHgqEiOPKtlYeYzPt5UEhFTLfot/wTj/YN0z9i79lfRfCOoC11HxBcSPqmtXKjckl5KFDKmRnYiJHGDxkR5wM4rqx+Ded462DdoU425ujd9k+p047CvOcb/sUrQhGzl3d9kfSlFFB4Ffpp+jiEfLimsQgz6Clzn8axvHetHw74O1G9U4a3t3Zf97Bx+uK4cxxkMHhKmLqOyhFyfolf9C6VNzmqcd27fefOXxd8THxX4+1C5BJiicwRc8bE4yPqcn8a5RvvGp3OQSeSck1A/3jX+RWfZrWzPMq+YV3eVScpP5t/gtkf0Jg8PGhQjRhtFJfcQSfeP1qqfvH61ak+8frVU/eP1rzaZ3w2I371Wn+41WX71Wn+41alFN/umoJOhqd/umoJOhrqiA1/wDV1DJ2+lTP/q6hk7fStjQhl6VUl/rVuXpVSX+tWtiokbdT9Kry/darDdT9Kry/datobFvch9foKhl+61Tev0FQy/datFuHQguPuVTk6Grlx9yqcnQ11UtgW5CP4qgf7pqcfxVA/wB01qWRD+Ko5O1SD+Ko5O1arc3WxDL3qvP2qxL3qvP2rWIyCb7tQSdqnm+7UEnatIgRyfcb8KqTffq3J9xvwqpN9+uqBa2IpPun6VXfrWroXhy/8W6rFYaXY3WoX052xwQRGSRz7Ac19Tfs9f8ABMy61KS31Xx9N9mg4ddKtpAZH9pZBwv0TJ/2hX2HC3BObZ9W9ll9JtdZPSK+e3yR4+bZ7g8uhzYmdn0W7fov12Pn34D/ALN/ib9oXxC1po1o0dnE4F1fzKVtrYe7d2x0Ucn2HNfoh+zt+zD4d/Zy8Oi10uH7RqU6j7ZqMqjz7o+n+ygPRRwPc8123hbwhpvgfQ4NN0mxttPsbVdsUEEYRFH0Hf1PU1qnpz1r+xuAPCzL+HYrEVP3mIa1k1ovKK6eu5+LcR8X4rM37OPu0/5e/m319Og6iiiv1Y+RCiiigAooooAKKKKACiiigBpAVaYzhOTwPWnNXzp/wVk8Y6x8P/8Agnt8S9Z0LVNR0XVrGwie2vbG4e3uLcm5iBKSIQynBI4PQmubFYhUKM6zV+VN/crmGKrqjRlVavypv7tT6K89f76/nR5w/vr+dfzBD9uf414H/F3vid/4U97/APHKP+G6PjX/ANFe+J3/AIU17/8AHK/P/wDiIuH/AOfUvvR8J/xEGh/z6f3o/p984f31/Ojzh/fX86/mC/4bo+Nf/RXvid/4U17/APHKP+G6PjX/ANFe+J3/AIU17/8AHKP+IjYf/n1L70H/ABEGh/z6f3o/p984f31/Ojzh/fX86/mC/wCG6PjX/wBFe+J3/hTXv/xyj/huj41/9Fe+J3/hTXv/AMco/wCIjYf/AJ9S+9B/xEGh/wA+n96P6ffOH99fzo84f31/Ov5gv+G6PjX/ANFe+J3/AIU17/8AHKP+G6PjX/0V74nf+FNe/wDxyj/iI2H/AOfUvvQf8RBof8+n96P6ffOH99fzo84f31/Ov5gv+G6PjX/0V74nf+FNe/8Axyj/AIbo+Nf/AEV74nf+FNe//HKP+IjYf/n1L70H/EQaH/Pp/ej+n3zh/fX86BMufvL+dfzBf8N0fGv/AKK98Tv/AApr3/45R/w3R8a/+ivfE7/wpr3/AOOUf8RGw/8Az6l96D/iIND/AJ9P70f0/ecv95fzoMy4++v51/MD/wAN0fGv/or3xO/8Ka9/+OUN+3P8awD/AMXe+J3/AIU97/8AHKP+IjYf/n1L70L/AIiBh/8An0/vR/T9GwkOQQcjqKcAATXyT/wRL+IOvfE//gnf4Q1nxJrWq+INWubvURNfajdyXVzKFvJVUNI5LHCgAZPAAr60U7hk199gsSsRQhXirKSTt6q591g8SsRQjXSspJP7x9FFFdZ0hRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRQelACBuM4ximeaob7wB96U52nnmvwZ/4K7/tdfFb4a/8ABRT4j6J4e+JPjrQtHsZrMQWOn67c21vAGsbdm2xo4VcsxJwOpJrw89zuGWUY1qkXJN20+88bO85hltFV5xck3bT0ufvN5o/vCjzR/eFfzD/8N6fHD/osHxN/8Ka8/wDjlH/Denxw/wCiwfE3/wAKa8/+OV8n/wARGw3/AD6l96Plv+Ig0P8An0/vR/Tx5o/vCjzR/eFfzD/8N6fHD/osHxN/8Ka8/wDjlH/Denxw/wCiwfE3/wAKa8/+OUf8RGw3/PqX3oP+Ig0P+fT+9H9O7yqvVh+dOEgfOMH8a/mGP7enxv8A+iwfE3/wprz/AOOV/Rl+yNrV54i/ZW+G2o6hdXF9f3/hfTLi5ubiQyS3Er2sTO7seWZiSSTySa+gyHialmk5xpwceVLdrqe9kfEdPM5zjTg48qT18z0miiivqD6QKKKKACiiigAooooAKKKKACiiigBo7VyXxd+CnhX49+Drjw/4w0HS/EWj3Jy9rfW6zJuGcMuRlWGeGUhh2IrrOg+v6UoPPUflWc6cZxcJq6ZE4RnFxmrpn5+fFH/g3I+BnjLU5bvQtR8aeEfMORbWd/Hc2yfQTxvJ/wCRKxPCP/BtN8INM1BJ9W8X+PtXhQ58hJ7W2R/ZiIS2PoQa/R4DJ6Y/Gg4B9TXjS4by1z53RV/w+7Y8h8O5c5c7pK/4fdseTfsy/sS/DD9kPSHtPh94R03Q3nQJcXfM97dAc4knkLSMM87d20HoBXq5JB4FLgHoOBR074r1qOHp0oKnRiopdErHqUaFOlBQpRUUuiVh9FFFbmw0fe9q4P8AaNvTZfC28QHBmkjj/wDHwf6V3h5ByeRXDfHfwhqXjTwlFZ6bCs8wuFdlLqg2gNnk+5FfD+I9LE1eGMdSwkXOpKnKMVFNttq1kl6no5PKnHHUpVGlFSTbe2jPm5vuVA/3jXdn9nzxWUx/ZyH/ALeE/wDiqib9nbxaT/yD4/8AwIT/ABr/ADVXhnxX/wBC6t/4Ll/kftP9t5f/AM/o/wDgS/zOCk+8frVU/eP1r0J/2dPFxbjTIzz/AM/Kf/FVB/wzX4wJJ/sxP/AiP/4qtYeGnFa/5l9b/wAFy/yNo57l1v40fvX+ZwD96rT/AHGr0V/2avGJJxpif+BEf/xVQS/sxeM3Rh/ZkfP/AE8x/wDxVarw14q/6F9b/wAAl/kV/b+Xf8/4/ev8zzV/umoJOhr0h/2XPGgXnTYR9bqP/wCKrl/HXw6n+G0bSeItW8MaDHjJbUdctbUAf9tJBWkvDziaC5p4Cql5wl/kRLiHLIr3sRBL/Ev8znX/ANXUMnb6Vyfij9o/4b+EyyXXxC8GTFeD9i1SO9/Lyd+a4rUv28vhTZkqnikXLDj9zp90R+ZjArhqcLZvB2nhpr1i/wDI5J8bZBT0njKS/wC34/5nrcvSqkv9a8if9v34ZSHC6xdn/twm/wDiaYf27fhvL01a8/8AAGb/AOJpLhzNLfwJf+Av/IzXH3Df/QbS/wDA4/5nrjdT9Kry/davKx+3B8O35Gq3Rzx/x5S//E01v20vh/Nnbqlz/wCAUv8A8TVxyHMktaMvuf8AkV/xEDhr/oOpf+Bx/wAz1D1+gqGX7rV5qv7YfgNicalc9P8Anzl/wpD+1x4HlB26jcc/9Ocn+FUskzBPWlL7mL/iIHDVv9+pf+Bx/wAz0S4+5VOToa4Zv2qfBk4wt/P/AOAsn+FRH9pbwjIDi+n/APAWT/CtYZTjUtacvuYl4g8Nf9BtL/wOP+Z3A/iqB/umuOX9onwq+cXsxz/07P8A4Un/AAvnw04OLyX/AMB3/wAKt5biv+fb+5lrxC4a/wCg6l/4HH/M60fxVHJ2rll+Nvh584upTn/pg/8AhSj4vaFOQBcyDPcwt/hVLAYhbwf3M0XiLwxb/fqX/gcf8zope9V5+1VrDxx4e1EjfrtnaA95be5OP++YmrotGn+Hl2R/aPxEgtB3+zaJeXBH/fSpXp4TIMXiGlBJesor82jnreJ/CtPWWOp/KSf5XOfm+7UEnavXvDF7+zpYFG1bxv4n1Nh95Y9Llt42+o8tm/Jq9S8FftLfsv8AgF0fT7VRNHys1xpNxcyA+oaRWIP0xX3uUeGTxDTxmPoUl1vNN/ctPxPDxnjRw1TVqNaM3/iSX4u/4Hzx4B+AvjD4qSKuhaBf3sUhAFwY/Ktx9ZGwv65r6E+FP/BL2a5aO78Za0I1GCbHTuSfZpWHHuFU+zV6Gn/BTv4OwqAmuXwxxgaXPx/45T/+HoXweH/Mdv8A/wAFlx/8TX7Pw34ecB5e1Ux2NhXmu80o/cn+bPjMy8ZKeJThQxFOmvKSb+9/oj1r4a/BXwz8INLFp4e0i005CAJJEXdLLj+85yzfia6tep6Y+tfPP/D0L4P/APQdv/8AwWXH/wATSH/gp/8AB/HGuX3/AILLj/4iv2nCcVcMYWkqOGxNKEVsoyikvkmfD1eKsuqzdSrioyb3bkm/zPojpRXzwP8AgqF8IMf8h2+/8Flx/wDE1Y0j/gpb8Jdc1a2soNbvnuLuVYYh/Zs4BZiABkrxya64ca5DJqMcZTu/76/zIXEeVt2WIh/4Ev8AM+gKKbG4ljVh0YZFOr6lM9sKKKKACiiigAooooAKKKKAEb+lfMf/AAWU/wCUaHxX/wCwdD/6VQ19ON/SvmP/AILKf8o0Piv/ANg6H/0qhrzM2/3Gt/hl+TPPzb/cq3+GX5H846fdFLSJ90Utfzcz+d2FFFFABRRRQAUUUUAFFFFABRRRQAUj/dNLSP8AdNAH9BX/AAQP/wCUZXgr/r81P/0umr7JHDV8bf8ABA7/AJRleCv+vzU//S6avsr+Kv6MyH/kXUP8MfyR/QmSf8i+j/hX5C0UUV7B6gUUUUAFFFFABRRketJvHqPzoAWik3j1H50uR60XAKKKKACiiigAooooAKKKKACijNFABRRRQAUUUZoAKKKKACiiigAooozQAUUUUAFFFFABRRRQAUUUUAFFGcU1pFXqwFFwuNYlVJHJFfzl/wDBZLWYtd/4KYfFWeJg6x39vbkj+9HZwRsPwKkfhX7u/tY/tj+BP2Ofhne+IvGWuWdmYYXezsBKpvNSkA+WKGLO5mJwM42rnLEAE1/NZ8ZfifffG34ueJvGGphV1DxRqlxqc6qcqjzSNIVHsN2B7AV+Z+IWPpOjDCxd5X5muyStr63Pzjj7G0vY08NF+9e7XZJW1+85miiivyc/LgooooABlmAUFmY4AHU1/U7+zl4Pm+H/AMAPBOhXCkT6PoNjZSA9mit40P6rX8//APwSZ/Yw1L9sb9rjQIGspJfCXha5i1bX7ooTCsUbbktyehaZ1Cbeu3e3RTX9GcY2xque2BX6z4eYGcKdTEyWkrJedr3P1PgDBTjTqYma0lZL5bklFFFfpZ+ihRQTiigAooooAKKKMj1oAKKTePUfnRuHqKV0AtFGaCcUwCiiigAooooAKKKKACiiigAooooAKKKqapqltoenzXV3PDa2tuhklmlcIkagZLMx4AABJJpNpK7E2lqyyV6VW1HUrfSLSWe6uIreCFS8kkjhEjUDJJJ4AA7mvz1/bc/4ODPAHwRlu9C+GVpH8QvEcJaNr5ZTHo9qw4z5g+afB7R4U9pK/Kr9qT/goT8W/wBsXUZH8beLr+50x33R6PZn7NpsPPAECcMR2Z9zf7VfG5vxrgcJeFP359lt83/kfI5rxjg8I3Cn78vLb5v/ACP2n/aR/wCC3XwI/Z8kns7bxFJ431mElTZ+HYhdoG/2pyVhAz12uxHpXxB8cf8Ag46+JHjGWa38CeFdA8IWjZRLm9ZtRux6MM7IlPsUb61+bFt94Vci/rX5tmXHGZ4i6py5F2jv971+4/P8fxnmGIbUJci7R/z3+6x7j8Uf+ChXxt+Nssp8RfEzxXcQzZ321teGxtm9jFBsjx/wGvK/tMt7M0s0kk0rnLO7FmY+pJrPgq5afd/GvicXja9eTlVm5Pzbf5nyuIxlas+arJyfm2/zLUQwfpV2DoKpRdauwdBXmVWccnoXbXtV2DqKpWvarsHUVwz2Eti7B90fWrtr2+tUoPuj61dte31rjqGMy9D9yr0HQVRh+5V6DoK457GMi9Z/eFXov61Rs/vCr0X9a4qmxlIuW/8AStCH71Z9v/StCH71cNQiRftfuCtCHqn41n2v3BWhD1T8a4KuxiaEX36mqGL79TVwTJnuFFFFZkhRRRQAUUUUAFdX8C9NOsfG3wfagZ+0a1ZxkexnQGuUr2b/AIJ+eDD41/a08JxFd0NjM99KcZ2iONmU/wDfYQfjXtcN4WWJzTDUFvKcV97R6WTUHWx1Giusor72j9ZrQbbaMeiipKRF2KB6Utf6GxVkkf1ilZWCiiimMKKKKACiiigAooooARv6V8x/8FlP+UaHxX/7B0P/AKVQ19ON/SvmP/gsp/yjQ+K//YOh/wDSqGvMzb/ca3+GX5M8/Nv9yrf4Zfkfzjp90UtIn3RS1/NzP53YUUUUAAGTRketFf0W/sD/ALLnw18T/sRfCTUdS+Hvgm/v73whpc9xc3Gh20s08jWkZZ3ZkJZiSSSTkkmvoeH8hnmlWdOE1HlV9Vfqe/kORTzOpKnGajyq+qufzo5HqKMj1Ff1G/8ADHXwm/6Jn4B/8J+0/wDjdH/DHXwm/wCiZ+Af/CftP/jdfVf8Q4rf8/l9z/zPp/8AiHtX/n8vuf8Amfy5ZHqKMj1Ff1G/8MdfCb/omfgH/wAJ+0/+N0f8MdfCb/omfgH/AMJ+0/8AjdH/ABDit/z+X3P/ADD/AIh7V/5/L7n/AJn8uWR6ijI9RX9Rv/DHXwm/6Jn4B/8ACftP/jdH/DHXwm/6Jn4B/wDCftP/AI3R/wAQ4rf8/l9z/wAw/wCIe1f+fy+5/wCZ/LlkeooJGDzX9Rv/AAx18Jv+iZ+Af/CftP8A43R/wx18Jv8AomfgH/wn7T/43T/4hxW/5/L7n/mH/EPav/P5fc/8z58/4IIHP/BMjwUMf8vmp/8ApdNX2QemcVk+EPBGj/DzQYdK0HStO0XTICzR2ljbJbwRliWYhEAUZJJOByTWsM8DvX6Xl+FeGw1Og3dxSV/RH6PgMM8Ph4UL35Ulf0Qm7gZ4z2p3U9etIfvZA/GvP/2i/wBprwX+yr8PLnxT441y00TSbfhWlbMty+CRHFGPmkc44VQT1JwATXRVrQpwc6jslu3sb1KkKcXObslu2egh8dTXlX7Q/wC218LP2UrLzvHvjbRNAlZN6WkkpmvJR6pbxhpWHuFxX5F/tx/8HAfxC+OVzeaJ8L1uPh74XcmMXwKtrN4vTcZBlbfPpHlh/wA9O1fAGt63e+JtWuL/AFG8utQvrtzJPc3MrSyzMerMzElifUmvz7NuP6NJungo877vRfJbs+BzTjyjTbp4OPM+70XyW7P2Q+Nv/BzF4F8OzTW3gHwJr3ih0JVbvU500y3Y/wB5VAkkYezBDXzB8Rv+DjL47+LHkTRbLwX4WgJ+Q29hJczKPdppGUn/AIAPpXwJRXxGK4vzSu9ajiuysvx3PjMVxZmdd61OVdlZf8H8T6c8S/8ABZX9pjxW7faPirqsCnotnY2drt9v3UKmuUvP+CmH7QN85Z/jB49Uk5/d6tLGPyUivDqK8qeb46Wsq0n82ebLNsbLWVaT/wC3n/me62H/AAU5/aD01w0fxf8AHLEf89dRaUfk2a7Dwv8A8Fp/2mvCjL5XxQvLqNeqXmmWVwG9iXhLfkRXy1RShnGOjrGtJfN/5ihm+NhrGrJfN/5n6DfDb/g4/wDjd4WmiTX9F8E+KLdcby1rLZ3D/Ro5Ng/79mvqb4Ff8HKPwy8ZXEFr488JeIvBU0hAa6tXXVbNPUsVCSgeyxtX4p0V7GE4xzSg/wCJzLs0n+O56uF4uzOg/j5l2kr/AI7/AIn9SnwJ/ag+H/7THh/+0/Afi3RfE9ooDSfY7gNLb56CSI4kjPs6g132enQmv5RvAPxE174VeKbXXfDOs6poGs2TboL3T7l7eeM+zKQcHuOh71+oP/BPz/g4cu7S7svC3x1hE9u5WGHxXZQbXi7ZuoEGGHrJEAR3Q8tX3mTcd4fENUsWuSXfp/wD7jKOOMPiJKlilySfXp/mv61P14O3NKCAPasrwj4v0vx74ds9X0XULLVdK1GFbi1u7SZZoLiNhkOjqSGB9RWp/BX3sZJq8T7qMlJXQ6mynbGxHJAp1Nn4hf8A3TTewPY/JP4y/wDBx74r+F/xh8V+GoPhj4fu4fDusXemJO+qzK0ywTPGHICcE7c4965z/iJ48Y/9Eq8O/wDg3l/+Ir8/v2t/+Trfid/2Nmq/+lkteemvwnE8W5rCrKMarsm+i7+h+JYjirNI1pRVV2TfRf5H6h/8RO/jD/olPhz/AMG8v/xFH/ETv4w/6JT4c/8ABvN/8RX5eUVz/wCt+bf8/n9y/wAjD/W3Nf8An6/uX+R+oZ/4Od/GBJP/AAqjw5z/ANRib/4iv0d/4J2/tXah+2t+ytofxD1LR7TQrnWJ7qL7HbztMkYhuJIQdzAHnZnp3r+Z+v36/wCCNnjPR/hL/wAEkvCPiLXr+30vR9Li1W/u7qc7Y4Ilv7ksxPfgduT0FfW8H8Q43F4ucMVUvFRb1SWzWuh9Vwln2MxWKlHFTvFRb2S6rU+z9S1KDSrSa5up4be3gQySSyOFSNQMliTwABzk18S/tQ/8F8/gp8AL660zw/cX3xG1q3JRo9F2ixjYdmunOwj3iEgr80v+Cm//AAVu8XftzeLb3Q9Eub3w78MLWQx2mmRuY5dUAPE12R94nGRH91OOrDcfj0DFLO+PJxm6WASsvtPr6L/MWc8cyjN0sClZfafX0X+Z+kPxP/4OWfip4gupF8J+CvB3hy1Ynab159SuE/4EGiT/AMcryXW/+C9P7TWrTFoPGml6YD0W20KzYD/v5G5/Wvjiivi63EuaVXd1pfJ2/Kx8dV4jzKo7utL5O35WPrX/AIfnftRZ/wCSmp/4T2mf/I9fYX/BE3/gpL8Z/wBrv9rLVvDPxC8Xrr2iWvhu41CO3GlWVptnS4tkVt0MSMcLI4wTjnpwK/Iiv0E/4Nuf+T8Nd/7E+6/9KrOvT4ezjHVcwpU6laTTaum20/lc9Hh/NsbUzClTqVZNOWqbbR+6HSiikdhGhJwAK/dD9sGk8DrVXVdYtdCsZbq8uYLW3gQySSzSBEjUdSzHgAepr4b/AOCi3/BcPwZ+yHqN94T8G29v438fWxMU8aTY07SH9J5F5eQHrEnIwQzIa/Hr9qH9u74q/thaxLceOvF2o6hZM++LSoZDb6dbc8bLdMJkdNzAtxyxr47OeMsHgpOnT9+a6LZer/yPks44vwmCk6cPfmui2Xq/8j9w/jz/AMFqv2e/gJNNbS+NYvFGpw5Bs/D0J1Akjt5qkQA+xkzXyl8UP+DniwgeWLwX8LL26Xny7nWdVW3I+sMSP/6Mr8iwMUV8Fi+PMyqv901BeSv+LufDYvjfMKrtTagvJX/F3P0B8Yf8HH3x1153GmaR4B0OI/d8uwnnkX6tJMVP/fIrz7Wf+C7/AO07qjkw+PbLTge1voFiQP8Av5C1fH9FeJU4izObu68vk2vyseNU4gzGbu60vk2vysfT2qf8Fm/2m9Yz5vxX1Rc/88dNsYf/AECEVxvir/gpJ8fPGcbR3/xe8ebHGGW21WW1DD6RFa8Torlnm+OnpKrJ+rf+ZyzzXGz0lVk/Vv8AzLniDxFqHizVZb/Vb+91O+mOZLi7naaWQ+7MSTVOiiuCUpSd5HFKUpO8jX8GeCL7x5qYtLCTS45mIA+3apbWCEn/AG55EX9a+hfBH/BHT9or4jaXFfaL4Ctr+wuPuXUPiLS3hceoYXJz+FfMddP8L/jT4v8Agjri6l4P8Ua94ZvcgmbTL6S2aTHZthAYexyDXZg5YVS/2mMmvJpfmmdWFlhVL/aYya/utL81+p9feDP+Deb9onxPKi3tp4P8OofvNf6yJMfhAktfSHwD/wCDZiwsb2C7+JfxCuL+JCGk03QLXyFbHY3EuSQe+IlPuK8o/ZD/AODiz4gfDe+tdM+K+mQeOtFyEfUrSNLTVYF/vFVAhmwOxCE93r9af2Z/2rvAn7Xfw/i8S+A9fttYsSQk8a5S4spMZ8uaI/NG3sRgjkEjBr9LyDKuHsW70rykvsyev3K1/wAT9GyLK8gxWtG8pL7Mnr9ysn+Jf/Z9/Zv8Gfsu/D638L+B9AstA0e3Yv5UAJedyADJJIxLyOcDLMSeAOgFd0M7uSMU4D5qacLyOPev0alShTioU1ZLZLY/QqdOMIqEFZLZIk6UUDpQeBWpoNbnr+dBbYDk15Z+1T+2L4B/Yz+Hj+I/HmtxadbNlbS2QeZd6jIBny4Yhy7cjJ4Vc5YqOa/Gn9t3/gvB8Uf2k7q70jwRNP8ADfwhISiCxm/4ml2nTMtyMGPP92LbjJBZ+tfP5xxLg8uVqrvP+Vb/AD7Hg5vxFhMvVqjvLst/n2P2C/aQ/wCCgnwg/ZPjdPHHjnR9Mv0XcNNhc3V+3p+4iDSAH1YBfevh341f8HNHhjSZprf4f/DrWNcwCqXms3iWEef7wijEjMPqyH6V+PV5eTajdy3FxLLPPO5eSSRizyMTkkk8kk96jr81x/HuOqtrDpQX3v72fnmO46xtVtYdKC+9/e9D7v8AiF/wcR/tA+LpJF0n/hDvCsRJ2fYtMM8ij3ad5AT/AMBA9q8m8Sf8FiP2lvFMjNc/FfXIie1pbWtmB+EUS1800V85Wz7MajvKtL72vwR89Vz3MajvOtL72vwR7fcf8FK/2gLttzfGHx/n/Y1aVB+QIq3pv/BUb9ofSHDRfF/xq5H/AD2vfOH5ODXgtFYLNcandVZfe/8AMwWa4xaqrL73/mfWvhD/AILj/tNeEpF3/ENNXhQ58q/0aykDfVhEr/8Aj1e5/Cv/AIOXfiXoEyJ4x8CeEvEluuAz6fNPps59yWMyZ+iivzXortw/EuZ0XeNZ/N3/ADudlDiLMqLvGs/m7/nc/eX9nv8A4OD/AIGfF24gs/EcutfD3UZcL/xNbbzrMsewnh3YH+1IqCvtPwT8QtC+Jnhy31fw7rOl65pV2Mw3lhdJcQSj2dCQfzr+Ueu9/Z//AGoviB+y14qXWPAXivVvDd2WDTR28ube6A/hlhbMcg9nU19XlviDXi1HGQUl3Wj+7Y+oy7j6tFqOMipLutH9235H9ShIwKXO3nHWvzW/4J+/8HAXhz4z3tl4W+L0Fl4N8R3BWGDWoiV0m9c8ASbiTbsfViUPPzJwK/SKG5ivIFeNxJHIAyspyCD0INfpWW5rhsdT9phpXXXuvVH6Ll2Z4fG0/aYeV117r1RZooHAor0j0AoozRQAw8il/ho+v418c/8ABUP/AIKw+Hv2C/DD6LpQtdf+I+pQl7HS9+YrBD0uLkqchP7qDDPjsMsOPG46jhKLrV5WS/qyOTGY2jhaTrVpWSPWf20f29fh5+wz4AOs+M9T3X1yrf2dpFqRJf6m47RpnhQcZdiFX1yQD+G/7ev/AAVa+Jf7dmr3Flf3jeGvBAkzb+HtPmYQsAfla4fgzv0PzYUEZVVrwz40/G3xV+0P8RdQ8WeM9au9d17U33TXNw33R2RFHyoi9AigKB0FcrX4xn/FuJxzdKl7lPt1fq/0Px7PeK8Rjm6VL3Kfbq/UKE6j60UJ1H1r4yR8mW7b7wq5F/Wqdt94Vci/rXPPYzLsHerlp938apwd6uWn3fxrhqdTGRai61dg6CqUXWrsHQVzVCHsXbXtV2DqKpWvarsHUVwz2Eti7B90fWrtr2+tUoPuj61dte31rjqGMy9D9yr0HQVRh+5V6DoK457GMi9Z/eFXov61Rs/vCr0X9a4qmxlIuW/9K0IfvVn2/wDStCH71cNQiRftfuCtCHqn41n2v3BWhD1T8a4KuxiaEX36mqGL79TVwTJnuFFFFZkhRRRQAUUUUAFfan/BHv4YPd+JvE/jCaNvLtYU0y2cjhmYiSXHuAsf/fdfFiRNLKqKCzMcAAZJNfrv+xj8Fh8Cf2fNC0aaIR6jJF9sv+OTPL8zKf8AdGE+iCv2LwVyGWNzxYya9yim/wDt56Jfr8j9B8OMreJzJYiS92mr/N6Jfr8j1iiiiv7GP6DCiiigAooooAKKKKACiiigBG/pXzH/AMFlP+UaHxX/AOwdD/6VQ19ON/SvmP8A4LKf8o0Piv8A9g6H/wBKoa8zNv8Aca3+GX5M8/Nv9yrf4Zfkfzjp90UtIn3RS1/NzP53YUUUUAFf02f8E5v+TCPg1/2Jmk/+kcVfzJ1/TZ/wTm/5MI+DX/YmaT/6RxV+j+HP+81f8K/M/QfD/wD3ip/hX5ntFFFFfrp+rhRRRQAUUUUAFFFFADM5HoKXd/8AWpOpz2rn/ib8RdI+EngHV/E2vXken6PodpLe3lxIfliijUsx9zgcAck4AqJyUU5ydkiZSUYuUtEjzP8Abo/bh8J/sIfBe58VeJJTc3kxMGk6XE4FxqtxjIjX+6o6u5GFHqSqn+e39rn9sTxx+2t8VLjxT411Jp3BZLDT4iVs9LhJ4ihQngdMscsxGSSa2/2/v22Ne/bt/aD1Hxbqbz2+j25a10PTWfKafZg/KMdPMb7zt3Y+gUDxGvw7iniWpj6zpUnanHZd/N/ofivE3EVTHVXSpO1NbLv5v9EFFFFfHnyYUUVZ0fR7zxFq1vYadaXV/fXcgigtraJpZZnPAVVUEsT6AVUYylLliEY8ztErUV9k/Ar/AIIR/tB/GuxgvLrQtL8E2M4DK/iK8MMxX/rhEskqn2dVNe/aD/wbDeK7m2VtU+LGgWcmOVtdFmuFB+rSx/yr3cPwvmlaPNTou3nZfnY9zD8NZlWjzQpO3nZfnY/Liiv098U/8Gx3jaxtXbRPih4Z1GYD5UvdLmtFb6lGlI/I18wftK/8Effjx+zBp1zqWq+E/wC39EtAWl1LQJft0MajqzIAJkUDks0YUetTi+G8yw8eapSdl1Wv5XJxXDuY4ePPUpO3lr+Vz5hoo7470V4TVjxbBRRRQB9d/wDBLr/gqt4k/YN8bwaPqst3rnwy1Scf2hphbe+nFjzc22fusOrJ91x6Nhh+/Pw7+IOjfFfwTpfiLw7qNtqui6zbJd2d3A+6OeNhkEf1B5ByDgiv5S6/Sv8A4N/P+ChFx8MfiWnwW8UX5bw34pmaTw/JM3FhfHkwAnok3OB2kAwMyE1+i8G8TTpVVgsQ7xlpFvo+3oz9A4Q4jnSqRwWId4y0i+z7ejP2pps/+of/AHTTgcjNNn/1L/7pr9eex+rvY/lv/a3/AOTrfid/2Nmq/wDpZLXntehftb/8nW/E7/sbNV/9LJa89r+Zcb/Hn6v8z+cMZ/Hn6v8AMKKKK5jnCvsb9pL9ru60L/gl98Dfgro100K6laXmveIdj8yR/wBp3QtYDjsWVpCp/uxGvjmp77UrjVGiNxK8vkRLBHn+BF6KPb/E124XGzoRmofbjZ+l03+Vjsw2NnQhUjD7a5fldN/faxBRRRXEcYUUUUAFfoJ/wbc/8n4a7/2J91/6VWdfn3X6Cf8ABtz/AMn4a7/2J91/6VWde7wz/wAjSj/iR7fDf/Izo/4kfucuD+Vfmx/wXN/4Km3n7PmnH4TfD7UHtPGOrWwl1rUoHxLo1q4+WKMj7s8g53dUQgjl1Zf0E+LfxDsfhJ8L/EfirUmK6d4c0241O5K9RHDG0jY98LX8uvxl+LGr/HX4r+IvGWvTtcav4lv5b+5YnIVnYkIvoqjCgdgoFfp3G2dzwmGjQou05317Jb/fsfpHGeczwmHVCi7TnfXslv8Afsc27tK7M7M7Mclickn1NJRRX4o3fU/HG29wooooAKCcV9Af8E9/+Cefi7/goJ8UpdH0R00nw/pWyTWtbmjMkVijE7UVQR5krYbamR0JJAGa/aP9nL/gjH8A/wBnbSIFHgyy8X6vGo83U/EaLqDyt6iJh5Kc9NqA+pPWvqMl4TxmYx9rG0Yd319F1Ppcn4XxmYR9rG0Yd319F1P5293saCwFf1Y6N8JfC/hq0Fvp/hzQ7GADAjgsYokA+iqBWX40/Zw+H3xHtHg8QeB/CWtRSDDLfaRb3AP/AH2hr6Z+HE7aVlf0/wCCfRvw8nbSsr+n/BP5Y8Yoxiv3H/bW/wCDf34Y/F/w9e6n8MoF+H/itEaSGGJ3k0q8fsjxEkxA9N0WAuc7Gr8VPiT8Odb+EHj/AFjwx4j0+bTNc0K6ezvbWUfNHIhweRwQeoI4IIIJBr4/OeHsVlsl7dJxezWz/wAmfI5xkOJy2SVZXT2a2f8AwTDooorwTxQr0j9lf9q7xn+x18WbLxf4L1OSzvICEurV2JtdThzloJ0B+ZD+anBUggGvN6K2oV50ZqpTdpLVNGtGtOjNVKbs1s0f05/sS/te+Hf22/gBpPjjw8xhF1m3v7F3DS6bdIB5kD+uMgg4G5WU4GcV69nFfhd/wbyftQXXwo/a8n8AXNww0P4i2bokTH5I763RpYnHoWjEqH1LJ6Cv3RztA7iv37hvNv7QwUa0viWkvVf57n7tw7mv1/Bxqy+JaP1X+YucDOOa+ef+CiX/AAUF8MfsAfBxtb1MJqXiLUw0Oh6Mkm2S/mA5Zu6wpkF3xxkAZZlB9e+MPxW0b4H/AAz1zxb4hulsdG8O2cl9dynkrGi5IUd2PAAHJJAHWv5r/wBtf9rvxD+21+0BrHjjX5HjjuHMGl2BfdHpdmpPlwL24BJY/wATsx74rh4r4h/s6goU/wCJPbyXc4+KM+/s+ioU/wCJLbyXcxP2k/2m/Gf7WvxSvPF3jjV5dU1O6JWKPlbexiySsMEecRxrngDknJJLEk8BRRX4fWrTq1HUqO7e7Z+KVq06tR1Kju3u2FFFFYmYUUUsaNM4VAXZjgADJJppN7DSb2Eors9H/Zx+IfiK1E+n+AvGl/AwyJLfRLmVCPqqEVj+Kvhp4j8BEDXPD+uaKWOAL+xltsn/AIGorV4aqlzOLt6Grw9ZLmcXb0MSiiisTEKKKKAA81+hv/BIP/gsbqP7N+uaZ8OPiZqU1/8AD26dbbT9SuHLy+HGJwoLHk22eCP+WfUcAivzyor0crzSvga6r0HZr7muzPQy3M6+BrqtRdmvua7M/rJsb6HUrOK4t5o54J1DpJGwZZFIyCCOCCO9WcEdK/L3/g3z/wCChU/xD8LTfBTxbfPcav4ctjc+G7iZ8vcWSkB7XJ6tDkFf+mZI4EdfqCefSv6AyjMqWPw0cRT67rs+qP3bK8yp47DRxFPruuz6oOMDilPrxTTz09K8v/bB/ak8Pfsc/ALXPHfiKQNbaXFttrVXCy6hctkRW6f7TN3/AIQGY8Ka7q9aFKDqzdopXbO2rVhSg6lR2SV2zxj/AIKt/wDBTPS/2BfhULTSzbaj8RfEUTjR7BjuW1TlTdzD/nmp+6v8bDA4DEfz++PPHms/FHxpqXiLxFqV3rGt6xO1zeXly5eWeRjySf0AHAAAGAK6D9oz9oHxL+1L8Ztb8c+LLw3esa3OZGUE+VaxjhIYwfuxouFA9Bk5JJPEV+C8ScQVMyr9qcdl+r82fh3EWfVMxr9qcdl+r82FFFFfNHzoUJ1H1ooTqPrUyAt233hVyL+tU7b7wq5F/WuaexmXYO9XLT7v41Tg71ctPu/jXFU6mMi1F1q7B0FUoutXYOgrmqEPYu2varsHUVSte1XYOorhnsJbF2D7o+tXbXt9apQfdH1q7a9vrXHUMZl6H7lXoOgqjD9yr0HQVxz2MZF6z+8KvRf1qjZ/eFXov61xVNjKRct/6VoQ/erPt/6VoQ/erhqESL9r9wVoQ9U/Gs+1+4K0IeqfjXBV2MTQi+/U1QxffqauCZM9wooorMkKKKKACiitr4d/D/VPil4007QNFtmu9R1OYRRIOg9WY9lUZJPYA1rh8PUr1Y0aSblJpJLdt7JGlKlKrNU4K7eiXdnuP/BNv9nBvjR8aItbvoGfQfCjpcysR8k1xnMMfvgjefZQD94V+oMaiNQv90Yrgf2bPgTp37O/wo07w5YhXeFfMurjbhrqdgN8h+p4A7AKO1d+cE1/c3h5wlHIcpjh5fxJ+9N+b6fLb7z+mOEsiWV4CNJ/HLWXr2+Q+igdKK+9PqAooooAKKKKACiiigAooooARv6V8x/8FlP+UaHxX/7B0P8A6VQ19ON/SvmP/gsp/wAo0Piv/wBg6H/0qhrzM2/3Gt/hl+TPPzb/AHKt/hl+R/OOn3RS0ifdFLX83M/ndhRRRQAV++P7EH/BTb4DfDn9jn4XaDrfxO8N6drGi+FdNsry1lkfzLaaO1jR0bC9QwIP0r8DqMD0r3cjz6rllSVSlFNyVtb/AKHt5JnlTLakqlOKfMra3/Q/pH/4e3/s4/8ARWvC3/f1/wD4mj/h7d+zj/0Vrwt/39f/AOJr+bfA9BRgegr6T/iIuM/59R/H/M+k/wCIg4v/AJ9x/H/M/pI/4e3fs4/9Fa8Lf9/X/wDiaP8Ah7d+zj/0Vrwt/wB/X/8Aia/m3wPQUYHoKP8AiIuM/wCfUfx/zD/iIOL/AOfcfx/zP6SP+Ht37OP/AEVrwt/39f8A+Jo/4e3fs4/9Fa8Lf9/ZP/ia/m3wPQUYHoKP+Ii4z/n3H8f8w/4iDi/+fcfx/wAz+kc/8FbP2cQP+SteFSf+ukn/AMTXtvw2+JWh/GHwRp3iXw1qdvq+g6tF51neQEmO4TJG5cgHGQfyr+UsgYPFf0f/APBIIH/h278J/Q6QeP8AttJX1HC3FVfM8RKjVikkr6X7pd2fR8NcTVsyrypVIJJK+l+6XU+kzgmvy6/4ORv2tZvCfw88NfCDSblornxOf7Z1oI2D9kifbBEfZ5lZv+3cetfqK2AD7c1/OF/wV7+Mknxt/wCCh/xHvvOMtromof2BaLnIjS0UQsB7GVZG+rmunjfMJYbLnCD1m7fLr/l8zfjPHvD5e6cHrN2+XU+a6KKK/DT8WCiiigDb+G3w51r4v/EDRvC/hyxl1LW9eu47Kyto+ssjnA56ADqSeAASeBX9Bv8AwTf/AOCWvgz9gzwJaXDWtnrnxDvIB/amuywhnViPmht88xwjpxhnxluyr8G/8G2P7Ntr4s+L3jH4n6nCjp4Ttk0rSWfkC5uAxmkX0ZIVCfS4NfsuLqMj76D8a/W+BskpRofX62spX5fJLS/qz9V4KyalGj9drK8pbeSWl/Vk4AHYUVH9ri/56J+dH2uL/non51+j88e5+g8y7klNeMSDBANN+1xf89E/Oj7XF/z0T86OaPcOaPc/Lb/gt1/wSY0fWfAusfGT4caVDput6QrXniPTLOIJDqNuOZLtEHCzIMs+AA6hm+8Pm/Hg1/WNqltaatp1xa3KQXFtcRtHLHIAyyKwwVIPUEHGK/mC/bD+C6fs7/tTePfBcKstn4f1q5gstxyxti5aAn3MTIfxr8g47yilQqxxdDRS0a6X7/M/J+OMppUKkcXR0UtGvPv8zzaiiivzw+BCrWh67d+GNbs9T0+4ltL/AE6dLm2niba8MqMGR1PYhgCD7VVoqoycZcyKjKUZc0T+nj9hz9oyD9rD9lHwT47jMYuNb09Texp92G7jJiuEHoBKj49sV6xMB5b/AENfmd/wbN/F6TxF+z9498FTyFz4X1mLULcE/chu4yNo9g9u5+rmv0xnH7t/90/yr+isjxv1vL6dd7ta+q0f4n9AZNjXisDTrvdrX1WjP5cf2t/+Trfid/2Nmq/+lktee16F+1v/AMnW/E7/ALGzVf8A0slrz2v57xv8efq/zPwXGfx5+r/MKKKK5znCiignFABQTgV98/8ABLj/AIIoal+2PoVr468e3l/4b8AzMTZQWwC3+tAHBdCwIihyCN5BLYO0AYav1m+B3/BOD4I/s8WcCeF/hz4aguYMAX13ai9vCfXzpt7j6Age1fZZRwVjMbTVWTUIva+7XdL/ADPr8q4NxeMpqtNqEXtfdrukfzc+Gfhx4i8aAHR/D+t6sD0+x2Ms/wD6Cprp7f8AZM+Kt3Hvi+GXxBkX1Xw7eEf+i6/qMt7GK2iCJHGiKMKAAABUnkrnhVP4V9LHw4p296s/u/4J9FDw9p296s/u/wCCfy5/8Mh/Fn/ol3xE/wDCbvP/AI3X3X/wb4/Ajxx8Mv22Na1DxL4M8V+HrCTwpdQJc6npNxaQvIbq0IQNIgBYhScZzwfSv2g8tQM7QPwpRGM8ADPtXoZdwNRwmJhiI1G3F3tb/gnfl/BNLCYiGIjUbcXe1v8Agny//wAFnPE03hT/AIJqfFKeBzG9xYwWZI7rNdwxOPxV2H41/OeBiv6Pf+Cv3gy48d/8E4firZW6F5bfSRqGB12200Vwx/75iav5wgcivmvERS+u029uX9T5zj9S+u029uX9Qooor89PggooooBH9C//AARB+DGn/CP/AIJ2+CZraBEvvFiy67fzBcNPJNIRGT/uwpEv/AfevrocnFfIn/BEL416b8Xv+Cd/gq2tp4m1DwkkmhX8AYFoJInYx5H+1C0Tf8CI7V9eLwfev6OyT2f9n0fZ7cq/I/oTJvZ/UaXs9uVfkOooor1j1BG+7mvw7/4ORfhbZeD/ANsLw34jtIo4ZvFugKbzaMGaa3keMSH38oxL9IxX7hk5GOg71+Fn/BxZ8bdP+JP7aGl+G9NniuR4G0ZLS9ZDkJdTSNM0eR/djMOfQkjqK+L47dP+y2p73VvX/hrnx/Gzh/ZrU97q3r/w1z4Aooor8PPxcKKKKAPW/wBgXxBN4X/bg+Ed5AxWRfF+lw5B6rJdRxsPxViPxr+nWM/u1+gNfzL/APBOjwhN45/bv+EenwqZG/4Smwu2AGcJBMszn8FjY/hX9NCYEf0Ffrvh0pfVare3MvyP1fw/T+rVH0uvyPy0/wCDlD9quTw94H8J/CPS7lo5fETf21rKo2CbaJytvGR3V5Q7/WBa/Hqvp7/gsf8AGF/jN/wUV+ItyJGe00G8XQbVCciJbVBE4HsZhK3/AAI18w4r4LijHSxWZVJt6J2XotPx3PhuJcc8VmFST2TsvRafjuFFFFfPnghRRXvP/BNb9kn/AIbT/a98M+DblJToUbtqetOpIK2UOGdcjoXJSMHsZAe1dOFw08RWjQpq8pNJfM6MLh516saMFdyaS+Z7z/wS5/4Isax+2Tp1r438dXN94Z+Hrvm0jhULf66AcExlgRHDnjzCCWwQo/iH7D/s/fsS/Cr9l/S4bbwR4I0HRZIVAN4tsJb2X3e4fdK34t9K9K8PeH7PwtodppunWsFlYWEKW9vbwoEjgjRQqoqjgKAAAB0xV0eg4NfvWS8OYTL6aUYpz6t738uyP3LJuHsLgKaUYpz6t738uyFWCNRwi4+lVdU0O01ixltru0t7q3mXbJFNGsiSD0Kngj61bVs8U49DXvuEXo0e44p6WPij9tP/AIIg/B/9p3Rby+8O6Ta/DvxcyloNQ0e3WK0lf/pvbDEbAnqybH77j0P4g/tNfsz+Lf2R/jDqXgnxpp/2LVtPIZJEJa3vYWzsnhfA3xtg4PBBBBAYED+pEZC/4V8Lf8F5v2OLT9oP9kS+8aWNqp8VfDdG1OCVF+eey4+1Qk91CDzR6GLj7xr4PivhehWoSxWGio1Iq7tomlvp3PiOKOGaNahLE4eKjOOrts1107n4MUUUV+Mn5AFFFFAHafs7fG7Vf2bvjl4W8c6KzDUPDGoxXqoG2idAcSRMf7skZdD7Oa/qA8A+NNP+KPgXRfEmkTi40rX7GDUbOUf8tYZY1kRvxVhX8pfWv38/4IWfHQ/Ej/gnX4XtbuQz3nhG8utBlYtyFjcSxL9FhmiUeyiv0XgDMVTqVMLUfutcy9Vp+Nz9B4Dx6hVqYao/da5l6rT8bn2q52jrX4Mf8F2/26Jf2mP2l5PA2i3nmeDfhzO9mBG2Y77Ufu3Ex9Qh/dL6bXI4ev1j/wCCoH7Vo/Y7/Yy8WeKrWdYdeuIRpeic8m9nykbD18td8uO4iNfzaTTPczPJI7SSSMWZmOWYnqSe5r1OP83cIRwNN/FrL06I9LjvNnCEcDTfxay9OiG0UUV+TH5YFFFFABQnUfWihOo+tTIC3bfeFXIv61TtvvCrkX9a5p7GZdg71ctPu/jVODvVy0+7+NcVTqYyLUXWrsHQVSi61dg6CuaoQ9i7a9quwdRVK17Vdg6iuGewlsXYPuj61dte31qlB90fWrtr2+tcdQxmXofuVeg6CqMP3KvQdBXHPYxkXrP7wq9F/WqNn94Vei/rXFU2MpFy3/pWhD96s+3/AKVoQ/erhqESL9r9wVoQ9U/Gs+1+4K0IeqfjXBV2MTQi+/U1QxffqauCZM9wooorMkKKKu+HPDl/4u1u20zS7Se+v7yQRwwQqXkkY9gBV0qc6s1Tpq7eiS6lwpuclCCu2Q6XpdzreowWdnBNdXd1IsUMMSF3ldjgKoHJJPGK/TX9gX9i2P8AZ38Mf23rcccvi7Vox52MMthEefJU+vQsR1IAHAyaH7DP7BFp8BLWHxJ4ljhvvGE6ZReHi0tSOVQ9DIRwz/ULxkt9QfdGOwr+rfCzwx/s1RzXNI/vn8MX9lPq/N/gfuXBHBbwdsdjV+8fwr+XzfmPAxRR1or94P08KKKKACiiigAooooAKKKKACiiigBG/pXzH/wWU/5RofFf/sHQ/wDpVDX0439K+Y/+Cyn/ACjQ+K//AGDof/SqGvMzb/ca3+GX5M8/Nv8Acq3+GX5H846fdFLSJ90Utfzcz+d2FFFFABRRRQAUUUUAFFFFABRRRQAj/dNf0g/8EgP+Ubnwn/7BB/8AR0lfzfP901/SD/wSA/5RufCf/sEH/wBHSV+heHX++1P8P6o+98P/APfKn+H9UfRt0+y2kY9FQk/hX8pnxI8Ty+NviN4g1mZi82ralcXsjHqzSSs5P5mv6sNY/wCQVdD0ib/0E1/JqBivR8SJO1CPr+h6HiHJ2oR9f0Ciiivyw/MgooooAsWmq3WnoVgubiBWOSI5CoJ9eKl/4STUv+f+9/7/ALf41Soq1UktmWqkujLv/CSal/z/AN7/AN/2/wAaP+Ek1L/n/vf+/wC3+NUqKPbT/mD2s/5i7/wkmpf8/wDe/wDf9v8AGj/hJNS/5/73/v8At/jVKin7af8AMHtZ/wAxd/4STUv+f+9/7/t/jVWe4kup2kld5JG6sxJJ/E0yiplOUviYpTk9woooqSQooooA/Sz/AINmPEUtn+0t8Q9JDYi1Dw5HdsuerQ3KqP0nb86/aWU5gf8A3TX4g/8ABtT/AMnoeLv+xQm/9LLSv28lOIX/AN01+5cDybymKfRv8z9q4Lk3lUU+jf5n8uX7W/8Aydb8Tv8AsbNV/wDSyWvPa9C/a3/5Ot+J3/Y2ar/6WS157X4rjf48/V/mfjuM/jz9X+YUUUVznOFej/shfAt/2mP2nvA3gRTIIvEmrw21y0f3o7cNvnce6xK5/CvOK+1P+CAXhqPX/wDgpF4fuZFDHRtJ1C9TIzhjD5Of/Ipr0cow6r42lRltKST9L/5HoZTQVbGUqT2lJJ+l9T97PCnhmx8FeGtP0nTbWCx0/S7aO0tbeFdscESKFRFHYBQAPpWl/BQSppQAR7V/SMYpLlR/Q0YqKshaKKKooMZooooAyPG/hWy8eeENV0TUoVudP1i0lsrmJuksUiFHX8VJFfzB/tU/s9av+yr+0D4o8Ba1HIt14fvnhilZcC7gJ3QzL7PGVb2zjtX9SJOG7V8U/wDBXn/glpB+3b4Ih8Q+GBa2HxJ8OQMlnLIRHFq8GS32SVuxySUc8KWIPDEr8bxjkU8fhlUoq84Xsu6e6/yPkeLskljsMqlJXnDZd11R+AdFbHj3wBrfwq8Y6h4e8SaVe6LrmlymC6s7yIxSwuOxB7dwehBBGQax6/D5wcG4yVmj8XnBwfJJWaCiiipJPb/2Gf2+PHH7A/xLk13wpLFd6dqAWPVtHuifsmpRqTjOOUkXJ2uORkjlSVP65fAH/g4T+BXxS0yBfFVzrPw+1UgCWHULR7q2L99k0AbK+7qn0r8HqK+jyjijHZeuSlJOPZ6r5dUfQ5VxLjcBH2dJpx7PVfLZr7z+lnSv+CoH7PesW3mxfF/wGikZxPq8UDf98uQf0rE8bf8ABX39m/wJaNLd/FXw9dBRkLp3m6g7ewECPX84NAOK+gfiLjLaU43+f+Z7svEDF20pxv8AP/M/Wj9s/wD4OO7S88O3uhfBTQ76O9uFMX/CRazEqC3z/HBbgtub0aUgA9Uavyi8QeIL7xZrt5qmp3dxf6lqM73N1c3EhkluJXYs7ux5LEkkk9SaqUV8lmudYrMJqeJle2yWiXyPlczznFY+SniJXtstkvkFFFFeSeWFFFej/srfss+L/wBsP4w6d4M8G6e93fXbB7m5ZT9m02AEB55mH3UXP1JwoBJAO1CjOtNU6avJ6JI1o0Z1pqnTV29Ekfav/BuT+y7cfED9pPWPideW7/2R4Gs3tLKVl+WS/uUKEKe+yAyZ9PNT1r9srpvLt3x6GvMP2O/2V/D37GnwA0TwJ4cQvbaZGXubtkCy6hcPgyzvjuzdB/CoVRwor066P+jyewNfv/D+Vf2fgFQl8W79X/lsfu2QZX9QwUaL+Ld+r/y2P5Wvjh4ok8cfGzxjrUrF5NY1u9vWY9zJO7/1rl6s6027WLv/AK7P/wChGq1fz/Xk5VJSfU/Ca8nKpKT6hRRRWRkFfq5/wbE/DeGbXPir4vliBuLeGx0i2kx91XMssoH1KQ/kK/KOv2Z/4Nj4kHwB+JDA/vD4giUj2FsuP5mvq+Caalm1O/S7/Bn1HB1NSzSF+l3+B+nY6UYoor95P3AKKKKAEbhayPHHha08ceDdW0a+jEtjq1nLZ3CHo8ciFGH4hjWwRkVHNt8l/wDdNRUinFpkTinFpn8nniTRJfDPiPUNNmOZtPuZLZ+MfMjFT+oqlXY/tEoE/aD8dgAADxFqAAHQf6TJXHV/MmIjy1ZJdGfzfiI8tWUV0YUUUViZBX2X/wAE7/2zL/8AZ3+CmqaJbXpto7nW5b0rnqWgt0z/AOQx+VfGlb3ha4ki09wruoMhOAT6CunDV5UpOUXa50Yas6UnKLsfpH/wcv8A7QT638U/AnwztZm+y6JYvr18it8rzzs0UIYf3kjjkI9p6/L6vof/AIKvfFWT4wf8FDfinqbSF47HWH0eIE5VEs1W149iYmP1YnvXzxXpcRYx4rMatTpdpei0R6HEGLeJzCrV6XaXotF+QUUUV4h44UUUUAFCdR9aKE6j61MgLdt94Vci/rVO2+8KuRf1rmnsZl2DvVy0+7+NU4O9XLT7v41xVOpjItRdauwdBVKLrV2DoK5qhD2Ltr2q7B1FUrXtV2DqK4Z7CWxdg+6PrV217fWqUH3R9au2vb61x1DGZeh+5V6DoKow/cq9B0Fcc9jGRes/vCr0X9ao2f3hV6L+tcVTYykXLf8ApWhD96s+3/pWhD96uGoRIv2v3BWhD1T8az7X7grQh6p+NcFXYxNCL79TVDF9+pq4agp7hRW98PPhd4h+LGuLpnh3R77V7xsZSCIsIwe7t91B7sQK+zf2cv8AgkxHbtBqfxGvfPYEONIspCE+kswwT7hMf7xr6nhvgfN87qKODpPl6yekV8/0R7mTcNZhmU7Yen7vWT0S+f6K7PlT4BfszeLf2j/EAsvD2nu1tGwW6v5spa2oP958cnH8K5Y+mOa/Sf8AZX/Ys8MfsxaOJLaP+1PENxGFudUnUB29UQc+Wmew5PGScDHqPhLwZpfgXQ4NN0ixtdOsLVdsMFvEI44x7Afr61rjqfWv6o4H8L8vyJLEVf3lf+ZrRf4V09dz9v4a4KwmV2qz9+r/ADPZei6eu4tFFFfqR9sFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAI39K+Y/8Agsp/yjQ+K/8A2Dof/SqGvpxv6V8x/wDBZT/lGh8V/wDsHQ/+lUNeZm3+41v8MvyZ5+bf7lW/wy/I/nHT7opaRPuilr+bmfzuwooooAK+hPAf/BKj9oP4m+C9K8RaD8NdV1HRtctIr+xukvLVVuIJEDo4DSggFSDyAea+e6/pq/4J0cfsF/Br38F6T/6RxV9XwnkVHM6s6daTSir6W7+aPqOF8ko5lVnTrSaUVfS3fzPwu/4c2/tMf9En1r/wOs//AI9R/wAObf2mP+iT61/4HWf/AMer+jnYD2FLsHoK+5/4h5gP55fh/kfaf6g4H+eX3r/I/nF/4c2/tMf9En1r/wADrP8A+PUf8Obf2mP+iT61/wCB1n/8er+jrYPQUbB6Cj/iHmA/nl+H+Qf6g4H+eX3r/I/nF/4c2/tMf9En1r/wOs//AI9R/wAObf2mP+iT61/4HWf/AMer+jrYPQUbB6Uf8Q8wH88vw/yD/UHA/wA8vvX+R/OM3/BG79pjBz8J9ZH1vrP/AOPV+4X/AATU+FviD4LfsN/Dnwt4o06XSNe0bTTBfWcjq7wP5jnBKkqeCOhPWvdj8349KQdcjvXs5Lwthssqyq0ZNtq2tvJ9Eexk3DOGy6q6tGTbatrbvfoiLUIxNZTr/fjZfzFfye63pb6Hrd7ZSgiSzneBgexViD/Kv6x5RmM+4xX8xv8AwUB+GUnwf/ba+KWgPGYUtfEl3PAuMYgmkM0P/kORK+a8R6LdKjV6Jtfel/kfO+INJulRq9E2vvS/yPIKKKK/Jz8tCiiigD1T4BfsS/FP9qPQb7U/AHg3UPE1jplwLW6lt5YVEMhUMFId1PQg9MV33/DoL9pLGf8AhVGv4/67W3/x2vpD/g28/aWtvh7+0T4p+HOpTrDB47sY7rTt7cG8tN5MY93hkkb/ALYgV+14YdPXpX6Pw9wlgsxwccRKbUtU0raNfLsfoWQ8KYLH4SNeU5KWqaVtGvl8z+cD/h0H+0l/0SjX/wDv9bf/AB2j/h0F+0l/0SjX/wDv9bf/AB2v6P8AI9KMj0r2/wDiHeB/nl+H+R7X/EP8F/z8l+H+R/OB/wAOgv2kv+iUa/8A9/rb/wCO0f8ADoL9pL/olGv/APf62/8Ajtf0f5HpRkelH/EO8D/PL8P8g/4h/gv+fkvwP5wP+HQX7SX/AESjX/8Av9bf/HaP+HQX7SX/AESjX/8Av9bf/Ha/o+ZwoycD8aTzk9V/Oj/iHmBX/LyX4f5B/qBgv+fkvwP5wv8Ah0F+0l/0SjX/APv9bf8Ax2j/AIdBftJf9Eo1/wD7/W3/AMdr+j3zU9V/OjzU9V/Ol/xD3Af8/Jfh/kL/AFAwX/PyX4H84X/DoL9pL/olGv8A/f62/wDjtH/DoL9pP/olGv8A/f62/wDjtf0e+anqv50eanqv50f8Q9wH/PyX4f5D/wBQcF/z8l+B+Tn/AAQk/YV+LX7MH7U3iTXPHvgjU/DWl3nhmWzhuLmSJlkmNzbuEGx2OdqMenav1inOY2GccflSqVcHlSaWf/UtjHQ19blOV08vwv1ek20rvXz9D6jK8sp4DDLD0m2tXrvqfy4/tb/8nW/E7/sbNV/9LJa89r0L9rf/AJOt+J3/AGNmq/8ApZLXntfzzjf48/V/mfgeM/jz9X+YUUUVznOFfen/AAbnoG/4KC3JIBI8K3pHt+/tq+C6+9f+Dc3/AJSCXP8A2Kt7/wCj7Wvb4Z/5GdH/ABI9rh3/AJGVH/Ej936KKK/ok/fgooooAKKKKAIycH0zTm/l+lIfkXJ4r49/4KFf8FjPh/8AsMNNoFsh8Y+PimV0ezmCx2WRlWupsER5HIQBnIxwAQ1ceNx1HC03VxElGK7/ANanJi8bQwtN1a8kkj1D9sX/AIJ6fC39t3QBb+N9DQ6nbxlLTWbJhb6jZD0WXB3Lkk7HDJk5255r8bf29P8AgkM37IN7eXOj/FT4f6/YxgyJpupatb6VrSr1wIZH2yYHdWBPZK4z9p7/AIK6/HT9qW8uItQ8YXfhvQ5iQuk+Hnawtwp/hdlPmyj1Duw9hXzPNK1xKzyM0juSzMxyWJ6kmvx/iLP8txrfsqHvfzXs/uW/zPybiDPcuxkn7Kj73817P7lv8xtFFeifDz9kX4qfFuxju/C/w48ca9ZSjclzZaLcSwMPUSBNv618bSoVKrtTi2/JXPkKVCpUfLTTb8tTzuivoTSv+CUP7Rms48r4ReLEz/z3iSD/ANDYVrR/8EcP2mJEDD4T6uB731mD+RmrsWT457UZfc/8jrWU417UZfc/8j5lor6b/wCHNv7TP/RJ9W/8D7P/AOPVbsf+CKP7T9+w2/Cy8jz3l1fT0x+c9Uslx72oy+5/5FLJ8c9qMvuf+R8s0V9n+Hf+CA/7SutyBbnwvoekKf4rvXLdgPr5TOf0r1PwH/wbQ/FbV5kPiPxx4I0SFvvGyW5v5V/Bo4lz/wAC/GuqlwzmlR2jRfzVvzsdNLhzMqjtGi/mrfnY/N2n2ttLf3McEEUk08zBI441LM7HgAAckmv2m+Ef/BtH8M/C8sU3jLxp4p8WSRnLQ2qRaXbSexA8yTH0kFfZX7Pn7Bnwg/ZcVH8D+AdA0W7jXaL8w/aL4juDcSlpce27FfQYLgDG1WniJKC+9/cv8z3cFwHjajviJKC+9/hp+J+Mv7FX/BC/4tftPXlpqfimzm+HHhFyrvc6nCRqFynpDanDDI/il2DnI3dK/Z39kf8AYr8BfsVfDlPDngfSRZpJte9vZm8y91KQDHmTSYG49cKAFXJ2gV64qhMAcUnUfSv0TJuGsHlyvTXNP+Z7/LsfoOUcOYTL1emry/me/wAuw/HFR3alrZwOpBqSkcZQj1FfQyV1Y95rSx/KJ8Q9Gfw54/13TpBtk0/UJ7Zh6FJGU/yrHr27/gpP8NJPhJ+3p8V9GkjMSjxFc3sC4xiG5b7TH/45KteI1/M2NouniJ039ltfc7H844yk6VedN/ZbX3MKKKK5TmCv1s/4NhvH8Jsfix4WeUC4SWw1SFM8spWaKQ/gVi/76FfknX0b/wAEqv2vYv2Lv2x9A8S6jM8fhrVlbRtbI6JazFf3pH/TORY5D3whA617/DONjhMxp1puyvZ+jVr/AInucOY2OFzCnVlor2fo1a/4n9I9FVNM1CDWdPguraeK4tbiNZIpYnDpIpGQykcEEEEEVbr+hE7q6P3tO+qCiiimMbnJ6Yqh4j1q28N+H73UL2RYLOyt5J55GOBGiKWYn2ABq8xweRXxL/wXP/bKs/2av2PdU8MWd2o8WfEeKTSLKFG/eRWrDF1OR1CiMmMH+9KuOhrgzLGQwuGnXqbJX/yRxZji4YXDzrz2iv8Ahl8z8G/GviN/GHjTWNXkBD6rfTXjA9cyOXP86zKKK/mypJyk5M/napJylzMKKKKkkK99/ZW/Zxuvi98Pr3U4YHkSHUXtsquQCIomx0/268CJwK/b7/ggh+z3Z2/7AkGs6pYR3DeKdfvtRgaReViQRWuB7brZz+Ne1kWVPMK7oror/kezkeWvG1nSXa/5f5n4v/FXxO/jb4o+JdZkYu+r6rdXrMe5klZyf1rBo70V5E5OUnJ9TyJScm5PqFFFFQSFFFFABQnUfWihOo+tTIC3bfeFXIv61TtvvCrkX9a5p7GZdg71ctPu/jVODvVy0+7+NcVTqYyLUXWrsHQVSi61dg6CuaoQy7bdquwdq+0v+CZf/BK3w5+3B8EdV8U6z4l1zQ7mw1qXTI4rOOJ43RIIJN5LgnOZWH/ARX0jH/wbyeB4x/yP3is/9sYP/ia+lwnAebYyhDEUIJxkrrVL9T6bB8IZliKEa9KKcZarVH5UwfdH1q7a9vrX6oR/8G9vgeMf8j54qP8A2xg/+JqaP/g358Exnjx14q/78wf/ABNOfhlnr2pr/wACX+ZrLgPN39hfev8AM/LeH7lXoOgr9P0/4IEeCkH/ACPXig/9sYP/AImpk/4II+DEUY8ceJ+P+mMP/wATXPLwuz9/8u1/4Ev8zN8A5v8AyL/wJf5n5kWf3hV6L+tfpgn/AAQe8GR9PG3if/vzD/8AE1Kv/BCvweo/5HXxL/36h/8Aia5p+FPEL2px/wDAl/mQ+AM4/kX/AIEv8z81rf8ApWhD96v0q03/AIIeeALcg3HirxfPjqI3t0z+cLV1/hv/AII9/CLQ2U3UXiDVcdrnUSoP/fpUpQ8Hs/qO0uSPq/8AJM0h4c5tLR8q9X/kmflra9BXReEvB2r+NL5LbR9K1HVbrOPKtLZ55D+Cgmv1y8G/sEfCHwJtNl4G0SRl+615G14w/GYvXqGi+GNO8PWSW1jY2lnbx/djgiWNF+gAAr3cF4FYidvruJUV2im/xdj1sJ4WVm74msl/hTf4u35H5c/C3/gmp8U/iK8UtxpVv4dsnAPm6nMEfH/XJdzg/wC8B9a+nvg9/wAElfB3hSSK58V6ne+J7lcEwKPslrn0IUlz/wB9gH0r63VNo6DHsMUoGBniv0XJPCPh/L2qk6bqzXWbuvu0X3o+yy3gPKcI1Nw55d5a/hsYXgr4e6L8OdHj0/RNLsdLs4vuxW0CxID64A6+/U1ujnPNLigZPav0mlRhSgqdOKSWyWiPsYU4wiowVkhcUUUVsaBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAjf0r5j/4LKf8o0Piv/2Dof8A0qhr6cb+lfMf/BZT/lGh8V/+wdD/AOlUNeZm3+41v8MvyZ5+bf7lW/wy/I/nHT7opaRPuilr+bmfzuwooooAK/ps/wCCc3/JhHwb/wCxM0n/ANI4q/mTr+mz/gnN/wAmEfBr/sTNJ/8ASOKv0fw5/wB5q/4V+Z+g+H/+8VP8K/M9oooor9dP1cKKKKACiiigAoxRRQAh5HNfiX/wchfs3y+Bv2k/DnxItYGGm+NdP+xXkgHAvbUBRuPYtA0ePXym9K/bMAkH3rwX/go/+x3aftt/speIfBzLFHrCqNQ0S4k6W19ECYyT2VwWjY9lkY9a+f4lyz69gJ0o/EtV6r/NXR4XEWWvG4GdKPxLVeq/zWh/NPRV7xT4X1HwR4l1DRtXs59P1XSrmS0u7WZdslvKjFXRh2IIIqjX8+yi4y5ZH4NKLjLlkFFFFSSangnxpqvw48Y6V4g0O9n07WdFuo72yuoTiSCaNgyMPoQPav31/wCCaP8AwVx8G/ts+E9P0XWryy8OfEu2jEd5pM0nlpqLgczWhY/Orckx5LpyCCAGP8+1Ot53tbhJYneKWJgyOjFWQjkEEdDX0WQcQ18sqNw1i94vr5rsz3ciz6tltRyhrF7x7/5M/rPVxt45HsaXqM5r+cv4Gf8ABYv9oX4C2cNpY+PLnXdNtwFW016FNRAA6DzXHnAD0EgFe8aH/wAHLHxks4guoeEPh5fFRgtHb3cBP1/fsPyFfpOH4+y2cb1Lxfpf8j9HocdZfON6l4v0v+R+3gwD1FVdT1S20ewnubu5htre2RpJZZHCJEoGSzE8AAc5NfiJ4p/4OTfjZq1s8WmeGvh5pJbpKbO6nkT6bp9v5qa+W/2kv+Ch3xk/aziktvHHjrVdQ0uQ5Ol22yysTjpuhhCq+OxcMfes8Xx/gKcX7BOb9LL8dfwM8Vx5gYR/cJyfpZfez7F/4LQf8FeE+Met2/w5+EXiG9i8P6LcfaNV1/Tbl4f7UuFBCwwOhBMCZJLA4dsY+VQW+Bf+GkfiJ/0P3jb/AMHlz/8AF1xdFfl2Y51isZXlXqSs30WyXY/M8xznE4uvKvOVm+i2S7I7T/hpH4if9D942/8AB5c//F0f8NI/ET/ofvG3/g8uf/i64uiuL63W/mf3s4/rVb+Z/eztP+GkfiJ/0P3jb/weXP8A8XQ37SPxFA/5H7xr/wCDy5/+Lri694/4JzfsVan+3R+0zo/hS3jmi0Czdb7xBeqCotLJWG4A9pJPuIPVs9FOOjBvFYirGjTk3KTstWb4WWKr1Y0acm5Sdlqz9ev+CDvwq8T+Fv2Oh4v8Yavruq6t4/uzqFqup3ktw1vYxgxwBfMJ27z5knHVZE9K+3Zjthf2U1R8NeHbHwh4esdI022is9O023S1tYIl2pBEihURR2AUAD6VfuBmJvcGv6Ey/CfVcLChe/KrX7vqz98wOF+rYaFC9+VWv3fV/efy4/tb/wDJ1vxO/wCxs1X/ANLJa89r0L9rf/k634nf9jZqv/pZLXntfzljf48/V/mfz5jP48/V/mFFFFc5zhX3r/wbm/8AKQS5/wCxVvf/AEfa18FV96/8G5v/ACkEuf8AsVb3/wBH2te3wz/yM6P+JHtcO/8AIyo/4kfu/RRRX9En78FFFFABRRQelAHyB/wWN/b9m/Yb/ZuUaDLGvjjxk8mn6KWAb7GqqDNdlTwfLDKFB43yJkEAiv589Z1m88Q6vdahqF1cX1/fStPcXE8hklnkYlmdmPJYkkknqTX3r/wcafEC58U/t1afobyMbPw14cto4o8/Ksk0ksrt9SDGP+ACvgGvwrjPM6mJzCdJv3YaJfm/vPxPi/MqmIx86Tfuw0S/N/eFFFFfIHyZ9f8A/BDy0+HF7+3fpy/EcaO0A0yZtDTVNn2V9T3xeUCH+Qv5fnFA38YXHzba/oMiMY2shQLjgDFfyaGvRPAn7XnxV+GNlHa+HviT460W0iGEt7TXbmKFB7IH2/pX3HDfFdLLaLoVKV7u91v8z7Th3imnl1B0KlO+t7rR/Puf1GZQ/wB386Xcvt+dfzT2f/BUL9oSxTanxd8asAMfvL4yH82zU3/D1H9of/orfi//AMCR/wDE19T/AMREwX/PuX4f5n03+v8Ag/8An3L8D+lPev8As/nR5gH9386/ms/4eo/tD/8ARW/F/wD4Ej/4mj/h6j+0P/0Vvxf/AOBI/wDiaP8AiImC/wCfcvwD/iIGD/kl+H+Z/Sn5g7EH8aPMHt+dfzWf8PUf2hx/zVvxf/4Ej/4mrdh/wVp/aO01w0XxZ8TMR080Qyj8mQ014iYLrTl+H+YLxAwfWEvw/wAz+kgnPWgjA6Yr+ebwz/wXQ/ad8OyoZPiFDqsSf8s73Q7BlP1ZIVf/AMer1/4cf8HKfxe8PTRr4m8I+CvEVsuNxtln0+4f/gW+RB/37rroce5ZN2lzR9V/k2dlHjrLZu0uaPqv8rn7c9uaMZFfnX8Cf+DkP4SePLiG18a6B4j8BXMmA1wUGpWKfV4gJf8AyDX3H8Hf2gfBX7QfhldY8E+J9G8TaccbpbC6WbyiRna6g7kb/ZYA+1fSYLOMHi/93qKXl1+7c+hwWbYTFf7vUT8uv3bnaUUZ4or0z0T8Uv8Ag5J/Z1l8HftDeF/iRaQEaf4w0/8As69kVeFvLX7pY+rQugH/AFxb0r82K/pY/wCCj/7IFt+2z+yj4i8G4ij1kKL/AES4k6W99ECYiT2VwWjY9lkY9a/m08S+G7/wb4jv9H1W0nsNU0u4e0u7adCklvKjFXRgehDAg/SvxDjfKpYbHPERXuT1+fVfqfi/GmVyw+NdeK92evz6r9SlRRRXxR8eFBGaKKAP0E/4Jdf8Fu9T/ZO0Wy8B/EiC/wDEPgS2xHp99AfMvtDT+5tJHmwDsuQyDO3Iwg/YH4DfthfDL9pvTI7vwL420DxCJE3tbw3Srdw/9dIGxKh/3lFfy9DinW88lpOssUjxSocq6MVZT6givtcn42xeDgqVVc8Vtd2a8r9vU+xyjjLFYSCpVFzxW13Zryuf1neeo6MD9CKqarrVpotlJc3d1b2ttEN0kk0gRIx6liQAK/lz0r9p74l6FarBY/ETx1ZwrwI4Neuo1H4CQCsPxf8AFDxN8QSDr3iLXdbIOR9v1CW5wf8AgbGvopeI9Pl92i7+v/APfl4h0+XSi7+v/AP3g/bO/wCC4fwf/Zk0e7s/DurW3xD8XKpWHT9HnEtpE/rPdLmNQD1CF37bR1H4iftP/tPeMP2vvjBqHjTxpqH23Vb3EcUUYK29hACdkEKZO2NcnAySSSSSxJPntFfFZ3xLisyajUfLBbRW3q+7Pjs64jxWYvlqaQW0Vt6vuwooor508AKKKKANHwj4T1Dx54r0zQ9JtpL3VNZu4rGzt4xlp5pXCIg9yxA/Gv6g/wBmP4J2n7O37Png/wAD2TK8PhjSoLBpEG0TyIg8yXHq77mPuxr8mv8Ag3t/YHuPiJ8UH+NPiSyK+H/C7Pb+H0mTi+vyNrzgHqkKkgH/AJ6MMHMZr9oWTn72K/YeAsplh8PLGTVnPRei6/M/W+BsqnQoSxdRay0Xouvzf5H8l9FFFfjx+SBRRRQAUUUUAFCdR9aKE6j61MgLdt94Vci/rVO2+8KuRf1rmnsZl2DvVy0+7+NU4O9XLT7v41xVOpjItRdauwdBVKLrV23OQK55q7sQ1fQ/br/ghB4SbQf2ELG9Zdo1vWL67U/3griDP5wkfhX2ioyK8a/4J8fC9vg9+xf8ONBljMNzb6LDcXEbDBSacefIp9w8rD8K9lXg1/VfD+GeHy2hRluoq/rZXP6RyWg6OAo0nuoq/rbUdRRRXsnqBRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAI39K+Y/8Agsp/yjQ+K/8A2Dof/SqGvpxv6V8x/wDBZT/lGj8V/wDsHQ/+lUNeZm3+41v8MvyZ5+bf7lW/wy/I/nHT7opaRPuilr+bmfzuwooooAK/ps/4Jzf8mEfBr/sTNJ/9I4q/mTr+mz/gnN/yYR8G/wDsTNJ/9I4q/R/Dn/eav+FfmfoPh/8A7xU/wr8z2iiiiv10/VwooooAKKKKACiiigAoboaKKAPzQ/4LX/8ABI+f49QXPxZ+Guned4ztIR/bWkwp8+uRIuBNEB1uEUYK/wDLRQMfMoDfi5PA9rO8UqPHLExR0dSrIRwQQehr+s9gHXB5r4X/AOCj/wDwRN8H/tj3V54r8JTW3gz4hTAvNciP/QNYfH/LzGoyrn/nqgz/AHlfjH5zxTwe8RJ4vBL3nvHv5rzPz7ibhH6xJ4rBr3nuu/mvP8z8FqK9S/ac/Yv+JX7HvidtM8e+FtQ0hWcpb36p5the+8U6/I3HO3IYZ5APFeW1+UV8NUozdOrFxa6PRn5bWoVKM3Tqxaa6PRhRRRWBkFFFFABRRRQAUUUUAFFCjcwA5J4AHU19ifsQ/wDBFb4r/tcXVlqurWM/gHwXMQ76nqtuy3N1H/0725w75HR22pjkMcYrtwWXYjFz9nh4OT8v1OzBYDEYqp7OhBt+X69j52/Zz/Zx8X/tWfFXT/BvgrSptV1i/b5iARDZxAgNNM/RI1zyx9gMkgH+hn/gnx+wZ4d/YF+B1v4b0kJf63f7bnW9WaPbLqNzjH1WJMkImeBk8szE7n7Hf7D/AIA/Ye+HY0DwRpIhe42tqGpXGJL7UpB0eWTAzjJwqgKuThRk17CRkciv2XhjhaGXL21b3qj+5eS/zP13hvhiGXr2tX3qj+5eSHAcU2f/AFL/AO6aeOlNn/1D/wC6a+xex9c9j+W/9rf/AJOt+J3/AGNmq/8ApZLXntehftb/APJ1vxO/7GzVf/SyWvPa/mXG/wC8T9X+Z/OGM/jz9X+YUUUVzHOFfev/AAbm/wDKQS5/7FW9/wDR9rXwVX3r/wAG5v8AykEuv+xVvf8A0fa17fDP/Izo/wCJHtcO/wDIyo/4kfu/RRRX9En78FFFFABRRRQB+H3/AAcj/CG88K/tfeHfF/kv/ZnivQkt1lx8puLWR1kXPr5ckJ/Gvzsr+ln/AIKG/sPaL+3p+z3feEdRkSw1W2f7boupbNxsLtQQpIHJjYEq69wcjkAj+eL9oz9mfxr+yl8Sbvwn440S50fVbZiY2ZSYL2POBLDJ92SM+o6dDgggfiXGmS1cPjJYpK8Ju9+z6pn41xjk9Whi5YqKvCWt+z6p/mjg6KKK+IPjAooooAKKKKACiiigAooooAKKKKACum+Evxl8V/Ajxlb+IPBviHVPDmsWx+S5sZzEzDOdrAcOh7qwKnuDXM0VpTqypyUqbs11RdOpOnJSg7NH7af8Etv+C49l+0lq+nfD/wCKQsdD8b3O2DTtVjAistbk6CNl6QznsB8jnhdpIU/o4pzyDxX8mMUr28ySRu8ckbBlZThlI6EHsa/f7/gij+3rdftmfs0tp3iO7N1438CtHp+pzO2ZL+BlP2e5b1ZgrKx7tGx/iFfrnB3FFTFS+p4t3lbR97dH5/mfq3CPEs8U/qmKd59H3t0fmfaRxjrX5i/8FuP+CSlz8ZhdfF34aaY0/iq2iB1/R7dMvrEaDAuIlHWdVADKOZFAx8ww/wCnLmhgGXBHSvss1yujj8O6FZaPZ9U+6Pr8zyyjjqDoVlo9n1T7o/kvdGR2VlKspwwIwQfSkr93P+Ckv/BD7wn+1ve33i/wLNaeDPiBPmWfMeNN1mQ95kUZjkJ6yoDnncrE5H41ftIfskfET9knxY2j+PvC2p6DMWKwXLx77O9A/ihnXMcg9gcjuAeK/D854bxeXzfPG8Oklt8/M/Fc34dxeXzfOrw6SW3z7M84ooor508EKKKKACiiigAooooAKKK0vB/g3V/iD4itdH0HS9R1rVr1/Lt7Oxt3uJ5m9FRAWP4CqhCUnyx3KjGUpcsTNr6s/wCCYn/BL3xL+318Qory7iu9H+HGkzj+1tX2bTckYJtrbIw0pHVuRGDk5O1W+lf2Af8Ag3p1rxfe2Xib44SPomkqVmi8M2kwN5dDqBcSqSIlPdEJcgkEoRX66+Avh9ovwv8ACFhoHh7S7LRtG0qIQWlnaRLFDAg6Kqjj39ySTzX6Hw3wVVqSWIxy5Y/y9X69kffcPcG1asliMcuWP8vV+vZEPwz+G+i/B/wNpXhnw5p1tpWiaNbJaWdrAuEhjUYA9Se5J5JJJJJJroSTnrQfqKMgds1+txgoxUIKyR+rRioxUYqyR/JdRRRX8vn80hRRRQAUUUUAFCdR9aKE6j61MgLdt94Vci/rVO2+8KuRf1rmnsZl2DvVy0+7+NU4O9XLT7v41xVOpjItRda9e/Yl+Bcn7SH7UfgnwcsTTWuqalG16AMYtIz5s5/79I+PcivIYutfqx/wb2/srtZaX4h+LeqW5Vr0NouiF06xqwa5mHsXVIwR/wA85B3r2OGcpeYZlSoWvG95ei1f37Hs8PZY8bj6dG2l7v0Wr+/Y/T22t1trdI1AVVGAAMAD0qWgdKK/qNJJWR/RCVlYKKKKYwooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAG5wuK8j/AG5f2eb79qz9lPxl8P8ATdQttLvvEtrHbxXVwjPHCVmjclgvJ4Qjj1r1xgOaDjFY1qMKsJUp7STT9HoZVaUatOVOWzTT9GfjIv8AwbH+PwP+SleEv/AC4pf+IZHx/wD9FK8Jf+AFxX7NY/2aMf7NfMf6kZT/AM+397/zPmv9TMr/AJH97Pxl/wCIZHx//wBFK8Jf+AFxR/xDI+P/APopXhL/AMALiv2b2j0o2jHSl/qTlP8Az7f3v/MX+pmV/wAj+9n4xn/g2S8fgZ/4WV4S/wDAGev1d/Zg+E118CP2dfA/gq8uoL688J6FZ6RLcQqVjnaCBIy6g8gEqSAfWu9Hy4A6GjGcdK9PLMgweXzlPDRaclZ6t/melluRYPAzc8PFptWerf5jxwKKKK9s9kKKKKACiiigAooooAKKKKACjFFB4FAGR4s8GaT490G50vXNMsNX028Ty57S8gW4gmX0ZHBVh9RXxX+0T/wb/fAr4zy3F74ettV+HuqS5bdo0+6zZvU28u5QP9mMxivuhfnPIxRjHeuDGZZhcVHlxEFL1Wv37nFi8uw2Kjy14KXqtfk9z8UPi5/wbT/FLw1LLJ4O8aeEfFFsmSqXyzabcv6ALiWPP1kFfPvjn/gjN+0p4BZ/tPwx1G/hQ8Sabe2t6H+ixyF/zUV/Rl94dqQHtXy2I4By2o70+aHo7r8dT5jEcDZdUd4Xj6O/5n8wet/sLfGzw6zfbPhH8SYQvUjw5duv5iMisGf9mb4k2zYk+HvjmM+jaFdD/wBkr+pnYAein8KDApPKL+VebLw5ofZrP7v+CefLw9ofZqv7kfy3WH7KHxT1Rwtr8NPiBcsegi8PXbk/lHXWeGf+Cbnx88XSqtn8IPH6buhutImtU/76lCj9a/pl8sZ6LTjEv90flV0/DnDL46sn8kv8yoeH2HXxVZP5Jf5n8+/w6/4IKftJePJo/tnhfR/C8Mv/AC11fWIcKPUrA0rj/vnNfTXwT/4NkJXkguPiL8SgEGPNsvD1ly3ri4n6f9+a/W8A4oIr1cLwNllF3nFz9X/lY9TDcFZZS1lFy9X/AJWPnT9mb/glb8D/ANlG4t73w34LsbvW7fBXVtWP2+9Vh/GjSZWI/wDXJUr6JjQRpgcD2oPzUqjC9a+pw2Eo4ePJQgorslY+mw+Fo0IclGKivJWHUUUV0nQFNlXdEwHcYp1FDA/If40f8G5Xjn4n/GLxZ4mt/iH4XtoPEWs3mpxwvZzs8KzTvIFJHBIDY49K5o/8GyPj8D/kpXhI/Swnr9m8H04o+lfJz4MyqcnOVN3fm/8AM+XnwflkpOTg7vzZ+Mn/ABDI+P8A/opXhP8A8ALil/4hkfH/AP0Urwl/4AXFfs3jPajaPSp/1Iyn+R/e/wDMj/UzK/5H97Pxj/4hkvH+cf8ACyvCX1+wT19E/wDBMH/gjL4q/YM/aUm8cax4x0LXLSXR7jTPs9payxyBpHiYNluMDyz+dfoiBk4pVXC8E10YXhHLMNWjWpQalF3WrN8Lwrl2HqxrUoNSi7rVjh0ooor6Y+kCiiigAooooAYc49f61wvx0/Zw8DftMeDpNA8d+GNK8SaY2WWO7iy8DEY3xSDDxv8A7SMD71T/AGnP2pfBv7Ifwsu/F3jfVY9M0u3OyJB89xezEErDDH1eRsHgcAAkkAEj8af2y/8Agvx8Vfj1qN3pvgBz8NvCzMyI9swk1W5TsXuMfuieDiIAr03t1r5zPM/wOChyYn3m/s2u36nz+d55gcFD2eI95v7Nr39eh7d+2b/wQR+Enw5t5tZ0P4xWXw2tZNzx2fiu5hktCf7scxeORQPcSH61+avxv+DenfB7XDZ2HxA8FeOMOV8zQJLuVVHqWlgjQ/8AAWauV8T+K9V8ba5PqetanqGr6lcndNdXtw9xPKfVnclj+JqhX4xmuPwmIk3h6Ch82/w2R+P5njsJiJN4eiofNv8ADZfcFGOKfb28l3cRxRI8ssrBERRlnYnAAHc5r9yv+CeX/BCz4ffA/wAFaV4g+J2kWXjbx1dRJPPa3yibTdLZgD5KQn5JWXoXkDAkfKFHWskyHEZnVcKNklu3sv8AgsrJsjr5lUcaNklu3sv+Cfij4E+FHir4o3Rg8M+GfEHiKYHBj0zTprtgfpGpr1TQv+CZX7QPiOLfb/CHx0ikZH2jTXtj+Um2v6UNC8Naf4Y0yKy02ys7Cyt12RQW8KxRxD0VVAAH0q9tGBwK+/o+HNBL97Vbfkkv8z7qj4fUEv3tVt+SS/zP5tP+HT37Rn/RJfFP/fuP/wCLo/4dO/tGf9El8U/9+4//AIuv6Tdg9B+VJ5Y9B+Vb/wDEO8D/AM/Jfh/kbf8AEP8AB/zy/D/I/mvn/wCCU/7RVuAW+Eniw5/uwo38mrmvFf7Avxv8EQPNqXwm+IMEEXLSrodxJGvuWRSP1r+nTy8HoDRsDHoB+FRPw6wjXu1JL7n+gpeH+Ft7tSX4H8md/Yz6VeyW11BNbXELFZIpUKOhHUEHkGoieK/pl/bC/YQ+HP7aHgG90rxfoFlJqMkDJZaxDCqahpz4+V45R82AcEoSUbGCDX82PxA8HXHw68fa54eu3SS60HUJ9OmdPus8MjRsR7ZU18NxFw3UyuUby5oyvZ+ndHxOf8O1MslG8uaMr2e23dGRRRRXzJ84FfcX/Bvl8W7j4ff8FB7DQxKws/G2k3mmyx5+VnijN1G2PUCBgPZzXw7X07/wRphluP8Agph8KVhDFhfXTHH90WVwW/QGvXyGrKnmNGUd+Zfi7M9XI6koZhRlH+Zfi7H9G4HAoxSJ90Utf0af0GNOCOvSsbxv8PdE+JXh640nxBpGma5pV2uye0v7ZLiCYejI4Kn8q2fuj1zQRlQelRKCkrS2JlCMlaWx8FftEf8ABvR8Evi7NPe+Fjrfw71KUlgumzfaLEse5gmyQP8AZjdB7V8d/Fr/AINr/i34Wmlfwj4q8I+KrVAdq3Jl066f0+Ta8f5yCv256DrSYz7185jeEcrxD5nT5X3jp+G34Hz2M4Uy3EPmcOV91p/wPwP5yPG3/BHL9pPwC7i7+Fur3iL0fTbq2vgw9QIpGb8wDXm+tfsOfGjw4W+2/CX4k24XqW8N3hUfiI8V/UCV3dqZ5ak9FP4V4NXw7wb/AIdSS9bP/I8Sp4f4R/w6kl62f+R/LLP+zP8AEi3ba/w98cI3o2hXQP8A6BVzTf2R/ivrMgS0+GPxCumPGIvDt4/8o6/qO8oZ+4v5Cl8sY+4tYLw4o9az+5f5mC8PqH/P1/d/wT+afwh/wS//AGhPHMipY/CLxrGzdPttibFfznKCvbfhh/wb0ftC+OpY21i18K+DoWOX/tHVVnkUey2wlBPsSPrX71pGMcY/AUNke/1Nd1Dw+wEHepKUvmkvyv8AidtDgLAxd6kpS+aS/K/4n5ifAX/g2g8F+G54br4ieONZ8TyLhmstLgXTrYn+6zkySMPdTGa+8f2f/wBkP4a/staJ9g8BeDtF8Oxuu2Wa3h3XM47eZO5Msn/AmNelDn0NOYfLwK+mwOR4HB64emk++7+96n0mByXBYT+BTSffd/exQMUUUV656gUUUUAfyV0UUV/LZ/M4UUUUAFFFFABQnUfWihOo+tTIC3bfeFXIv61TtvvCrkX9a5p7GZdg71ctPu/jVODvWhpVpLqFzFBBFJNPO6xxxopZ5GJwFAHJJPGK5JJuVkZ2voj0b9lv9nnW/wBqj456D4H0FCbvWLgLNOVLJZQLzLO/+yiZPucAckV/Rf8ABj4T6P8AAz4XaH4R0K3FtpOgWiWlun8RVRyzHuzHLMe5JPevl3/gkD/wTzX9j74SN4h8SWsY+IHiyFXvAwBbS7fIZLUHs2cNJjq2ByEBP2X1HXiv33gXht5dhXiKytUnv5Lov1Z+28G5C8DhvbVl+8n+C6L/ADHdKKOtFfen2YUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUYxRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAYxRRRQAUYFFFABRRRQAUUUUAFFFFABjFFFFABRRRQAUUUUAFFFFABRRRQAY5ooooAKKKKACiiigApJH2ISe1LUN8CbOUKcEqcH3pSdk2KTsrn87n/BYX9srUv2tf2xfEMCXkreEvBV3Noui2oY+ViNyk1xjoWlkUnd12BB2r5UrT8bW9zZ+M9XivAwu4r2ZJw33g4kYNn3zmsw8V/NWY4mpiMTOtUerbP50zDFVK+JnVq7tv+vkFFFFcJxlrQ9Zn8O63Z6halVubCdLiIsMgOjBhkd+QK/pI/YZ/wCChXw//bm+GlhqHh7VrO18Rx2yHVNBnmVbzTpcDeNh5ePP3ZFBUjGcHKj+a3tVnR9ZvPDuqQX2n3dzY3tsweG4t5WiliYdCrKQQfcV9Lw9xFUyucmo80ZWutttmj6Hh/iCeWVJNR5oytdbbbNM/rIVww4waMYGf6V/N18Nf+Ct37RvwptUg0z4q+ILqBAAF1RYdUOPTdcpI3616jpP/Bwd+0dp0IWbVfCt+f70+iqCf++Co/Sv0Kl4g5fJe/GSfon+p99S49wEl78ZJ+if6n77fhR17frX4Lf8REH7RH/PXwT/AOCdv/jlQXv/AAcLftFXUZCX3hC2OPvR6Nk/+PORWz4+yztL7l/mbf69Zb/e+7/gn73n5R6VDNexW8Rd5ERVGWJYDA9TX89Hin/guR+054niaMfERdNifgrZaNYxn8GMRcfga8Q+K37XnxS+OkMkPi/4heL/ABBbSnc1rdapM9t+EW7yx+C1xV/ETBxX7mnKT87L/M5K/H+ES/cwk352X+Z+13/BQv8A4LSfDn9lzwhquj+EdX0/xp8QpYmgtbOwlFxaadKQQJLmVSVAU8+UpLkgAhQdw/BPV9Wude1a6v7yZ7i8vZnnnlc5aWRmLMx9yST+NVwOKOor8+zziDEZnUUqtlGOyXS/5s+BzvPa+ZVFKppGOyXT/NhRRRXgHhhX3v8A8G7PwZn8fftzz+KGiY2PgbRZ7hpcZVbi4H2eNPqUeY/8ANfBdpay313FBBFJNPO4jjjjUs8jE4AAHJJPav6GP+COP7DMv7FH7K1vFrdsIvGvjCRdV1tSPmtSVxDak/8ATJCc/wC28mMjFfX8GZZLE5hCpb3Yat+fRfefV8H5bLE4+NS3uw1b8+i+8+uQMCiiiv3U/bQooooAKKKKACiiigAooooAKMZoooAKKKKACiiigAooooA/krooor+Wz+ZwooooAKKKKAChOo+tFCdR9amQFu2+8KuRf1qnbfeFbHhvw/f+K9btNM0uyutR1G+lWC2tbaJpZp5GOFVVUEsSegArFxlLSJCjKT5Yi26lmwASTwAO9frv/wAEa/8Agk5L8Pzp3xZ+JemmPXGUT+HtGuY/m08HpdTKekxH3EP3B8x+bGzS/wCCVv8AwRYg+DU2nfEP4s2dvfeK49txpehMRLb6O3VZZuqyTjsoyqHn5mwV/SNV2gcdK/VuD+CnSccfj4+9vGL6eb8+yP1DhThH2bjjMdH3lrGL6eb8/IeFAGMAUuOKKK/Vj9LCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACkkTzEK+tLR1oA/n6/wCC2P7Dep/suftV6x4osrKV/BHxAvJdTsrqND5drdSEvPaseisHLOo7owxna2PjCv6pvjH8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";
+
+    // F7.1-0-5 Analiz Hizmet Kapsamı Formu Resmi Metotları
+    const OFFICIAL_PARAMETER_CONFIGS = {
+      "nem": { 
+        name: "Nem", 
+        unit: "%", 
+        method: "70 °C’de Sabit Ağırlığa Gelene Kadar", 
+        isMax: true, 
+        stdDefault: 35.0, 
+        tol: 0 
+      },
+      "om": { 
+        name: "Organik Madde", 
+        unit: "%", 
+        method: "Walkley Black", 
+        isMax: false, 
+        stdDefault: 45.0, 
+        tol: 1.1 
+      },
+      "thf": { 
+        name: "Toplam Hümik Fulvik Asit", 
+        unit: "%", 
+        methodKatı: "TS 5869 ISO 5073/Ocak 2003", 
+        methodSıvı: "HA4/JC (CDFA California Method)", 
+        method: "TS 5869 ISO 5073/Ocak 2003", 
+        isMax: false, 
+        stdDefault: 25.0, 
+        tol: 1.1 
+      },
+      "ph": { 
+        name: "pH Tayini", 
+        unit: "-", 
+        method: "1/10 Potansiyometrik", 
+        isRange: true, 
+        stdDefault: "5.00 - 8.00" 
+      },
+      "ec": { 
+        name: "EC Tayini", 
+        unit: "mS/cm", 
+        method: "1/10 Sulu Çözeltide", 
+        isMax: true, 
+        stdDefault: 4.0, 
+        tol: 0 
+      },
+      "yogunluk": { 
+        name: "Yoğunluk", 
+        unit: "g/cm³", 
+        method: "Katılarda Dökme Yoğunluk / Sıvılarda Sıvı Yoğunluğu", 
+        isRange: true, 
+        stdDefault: "-" 
+      },
+      "topAzot": { 
+        name: "Toplam Azot", 
+        unit: "%", 
+        method: "TS EN 15478 - TS EN 15476", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "tkn": { 
+        name: "Toplam Kjeldahl Azotu", 
+        unit: "%", 
+        method: "TS EN 15478", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "nh4N": { 
+        name: "Amonyum Azotu (NH4-N)", 
+        unit: "%", 
+        method: "TS EN 15475", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "no3N": { 
+        name: "Nitrat Azotu (NO3-N)", 
+        unit: "%", 
+        method: "TS EN 15478 – TS EN 15476", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "ureN": { 
+        name: "ÜRE Azotu (NH2-N)", 
+        unit: "%", 
+        method: "TS EN 15475 - TS EN 15478", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "topP2O5": { 
+        name: "Toplam P2O5", 
+        unit: "%", 
+        method: "TS EN 15956 – TS EN 15959", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "sudaP2O5": { 
+        name: "Suda Çözünür P2O5", 
+        unit: "%", 
+        method: "TS EN 15958 – TS EN 15959", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "topK2O": { 
+        name: "Toplam K2O", 
+        unit: "%", 
+        method: "TS ISO 7407 – ICP-OES", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "sudaK2O": { 
+        name: "Suda Çözünür K2O", 
+        unit: "%", 
+        method: "TS EN 15477", 
+        isMax: false, 
+        tol: 1.1 
+      },
+      "topSO3": { 
+        name: "Toplam SO3", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.5(TS EN 16032)", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "sudaSO3": { 
+        name: "Suda Çözünür SO3", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.3- 8.9 (TS EN 15926-15749)", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "zn": { 
+        name: "Çinko (Zn)", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 9.1- ICP-OES", 
+        isMax: false, 
+        tol: 0.2 
+      },
+      "b": { 
+        name: "Toplam Bor (B)", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 9.1- ICP-OES", 
+        isMax: false, 
+        tol: 0.2 
+      },
+      "ca": { 
+        name: "Toplam Kalsiyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.1- ICP-OES", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "sudaCa": { 
+        name: "Suda Çözünür Kalsiyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.3- ICP-OES", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "mg": { 
+        name: "Toplam Magnezyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.1- ICP-OES", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "sudaMg": { 
+        name: "Suda Çözünür Magnezyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.3- ICP-OES", 
+        isMax: false, 
+        tol: 0.9 
+      },
+      "na": { 
+        name: "Toplam Sodyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.1- ICP-OES", 
+        isMax: true, 
+        tol: 0 
+      },
+      "sudaNa": { 
+        name: "Suda Çözünür Sodyum", 
+        unit: "%", 
+        method: "Gübrelerin Piyasa Gözetimi ve Denetimi Yönetmeliği Ek-3 Mad. 8.3- ICP-OES", 
+        isMax: true, 
+        tol: 0 
+      },
+      "elek_gt4": { 
+        name: "Elek Analizi (>4 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isMax: true, 
+        stdDefault: "2.00 max.", 
+        tol: 0 
+      },
+      "elek_3_4": { 
+        name: "Elek Analizi (3-4 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isRange: true, 
+        stdDefault: "-" 
+      },
+      "elek_2_3": { 
+        name: "Elek Analizi (2-3 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isRange: true, 
+        stdDefault: "-" 
+      },
+      "elek_lt2": { 
+        name: "Elek Analizi (<2 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isMax: true, 
+        stdDefault: "3.00 max.", 
+        tol: 0 
+      }
+    };
+
+    let currentOfficialReportRecordId = null;
+    let currentOfficialReportRecord = null;
+
+    // Avrupa tarih formatı (DD.MM.YYYY, saat bilgisi içermez)
+    
+    // Analiz tarihine göre ay-yıl kodu üretir (Örn: 12.02.2026 -> 02-26, 24.09.2026 -> 09-26)
+    function getAnalysisMonthYearCode(dateVal) {
+      if (!dateVal) {
+        const d = new Date();
+        return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getFullYear()).slice(-2)}`;
+      }
+      let s = String(dateVal).trim().split(" ")[0].split("T")[0];
+      const m1 = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+      if (m1) return `${m1[2].padStart(2, "0")}-${m1[1].slice(-2)}`;
+      const m2 = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+      if (m2) return `${m2[2].padStart(2, "0")}-${m2[3].slice(-2)}`;
+      const dt = new Date(dateVal);
+      if (!isNaN(dt.getTime())) {
+        return `${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getFullYear()).slice(-2)}`;
+      }
+      return "02-26";
+    }
+
+    function formatEuropeanDateOnly(val) {
+      if (!val) return "";
+      let s = String(val).trim();
+      s = s.split(" ")[0].split("T")[0];
+      const m1 = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+      if (m1) return `${m1[3].padStart(2, "0")}.${m1[2].padStart(2, "0")}.${m1[1]}`;
+      const m2 = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+      if (m2) return `${m2[1].padStart(2, "0")}.${m2[2].padStart(2, "0")}.${m2[3]}`;
+      const dt = new Date(val);
+      if (!isNaN(dt.getTime())) {
+        return `${String(dt.getDate()).padStart(2, "0")}.${String(dt.getMonth() + 1).padStart(2, "0")}.${dt.getFullYear()}`;
+      }
+      return s;
+    }
+
+    
+    function onReportTalepEdenChanged(val) {
+      const rec = currentOfficialReportRecord || (labRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                  (deletedRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                  (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(currentOfficialReportRecordId)) : null);
+      if (!rec) return;
+      rec.talepEden = val;
+      rec.firma = val;
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified();
+      renderOfficialReportDOM(rec);
+      if (typeof showToastNotification === "function") {
+        showToastNotification(`Talep Eden: ${val || "FERGO"} olarak güncellendi.`);
+      }
+    }
+
+    function onReportBazChanged(val) {
+      const rec = currentOfficialReportRecord || (labRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                  (deletedRecords || []).find(r => String(r.id) === String(currentOfficialReportRecordId)) ||
+                  (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(currentOfficialReportRecordId)) : null);
+      if (!rec) return;
+      rec.baz = val;
+      if (typeof markLocalDatabaseModified === "function") markLocalDatabaseModified();
+      renderOfficialReportDOM(rec);
+      if (typeof showToastNotification === "function") {
+        showToastNotification(`Rapor Bazı: ${val} BAZ olarak güncellendi.`);
+      }
+    }
+
+    function openOfficialReportModal(recId) {
+      if (!recId) return;
+      const rec = (labRecords || []).find(r => String(r.id) === String(recId)) ||
+                  (deletedRecords || []).find(r => String(r.id) === String(recId)) ||
+                  (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(recId)) : null);
+      if (!rec) {
+        if (typeof showToastNotification === "function") showToastNotification("Analiz kaydı bulunamadı.");
+        return;
+      }
+      currentOfficialReportRecordId = rec.id;
+      currentOfficialReportRecord = rec;
+
+      // Talep Eden dropdownunu doldur ve seçimi eşitle
+      const talepSelect = document.getElementById("reportTalepEdenSelect");
+      if (talepSelect) {
+        const curVal = (rec.talepEden !== undefined && rec.talepEden !== null) ? rec.talepEden : (rec.firma || "");
+        const firmaListUnique = Array.from(new Set([
+          "",
+          ...(Array.isArray(FIRMA_LIST) ? FIRMA_LIST : []),
+          curVal
+        ])).filter(f => f !== null && f !== undefined);
+
+        talepSelect.innerHTML = firmaListUnique.map(f => {
+          if (!f) return `<option value="" ${!curVal ? "selected" : ""}>FERGO (Varsayılan)</option>`;
+          return `<option value="${escapeHtml(f)}" ${f === curVal ? "selected" : ""}>${escapeHtml(f)}</option>`;
+        }).join("");
+      }
+
+      // Baz dropdownunu eşitle
+      const bazSelect = document.getElementById("reportBazSelect");
+      if (bazSelect) {
+        const curBaz = (rec.baz && String(rec.baz).toUpperCase().includes("YAŞ")) ? "YAŞ" : "KURU";
+        bazSelect.value = curBaz;
+      }
+
+      renderOfficialReportDOM(rec);
+
+      const modal = document.getElementById("officialReportModal");
+      if (modal) {
+        modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
+        modal.scrollTop = 0;
+      }
+    }
+
+    function closeOfficialReportModal() {
+      const modal = document.getElementById("officialReportModal");
+      if (modal) modal.classList.add("hidden");
+      document.body.classList.remove("printing-official-report");
+    }
+
+    
+    window.openOfficialReportModal = openOfficialReportModal;
+    window.closeOfficialReportModal = closeOfficialReportModal;
+    window.printOfficialReport = printOfficialReport;
+    window.onReportTalepEdenChanged = onReportTalepEdenChanged;
+    window.onReportBazChanged = onReportBazChanged;
+    window.openAnalysisMethodsModal = openAnalysisMethodsModal;
+    window.closeAnalysisMethodsModal = closeAnalysisMethodsModal;
+
+    function printOfficialReport() {
+      document.body.classList.add("printing-official-report");
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove("printing-official-report");
+      }, 1000);
+    }
+
+    window.addEventListener("afterprint", () => {
+      document.body.classList.remove("printing-official-report");
+    });
+
+    function renderOfficialReportDOM(rec) {
+      const container = document.getElementById("officialReportContainer");
+      if (!container) return;
+
+      const numuneNo = (typeof getNumuneId === "function") ? getNumuneId(rec) : (rec.numuneId || ("O/26-" + rec.id));
+      const subTitle = document.getElementById("officialReportSubtitle");
+      if (subTitle) subTitle.innerText = `Numune: ${numuneNo} | Ürün: ${rec.urun || rec.urunAdi || '-'} | Resmi Analiz Sertifikası`;
+
+      // Tarih kuralları:
+      // Numune giriş tarihi ve analiz tarihi kaydın içindeki Analiz Tarihi olsun
+      // Rapor tarihi ise pdf çıktısının alındığı anki tarih olsun (Avrupa biçimi DD.MM.YYYY, saat bilgisi içermez)
+      const recDate = formatEuropeanDateOnly(rec.tarih);
+      const numuneGirisTarihi = recDate || formatEuropeanDateOnly(new Date());
+      const analizTarihi = recDate || formatEuropeanDateOnly(new Date());
+      const now = new Date();
+      const analizRaporTarihi = `${String(now.getDate()).padStart(2, "0")}.${String(now.getMonth() + 1).padStart(2, "0")}.${now.getFullYear()}`;
+
+      // Talep eden tesis organo içi kısmı: "GÜBRE TESİSİ"
+      const tesis = "GÜBRE TESİSİ";
+      // Talep eden firma: seçilen firma veya boş ise FERGO
+      const talepEdenFirma = ((rec.talepEden !== undefined && rec.talepEden !== null) ? rec.talepEden : (rec.firma || "")).trim() || "FERGO";
+      // Analiz tarihine göre ay-yıl kodu (Örn: 12.02.2026 -> 02-26)
+      const ayYilKodu = getAnalysisMonthYearCode(rec.tarih);
+      const urunAd = (rec.urun || rec.urunAdi) ? String(rec.urun || rec.urunAdi).toUpperCase() : "-";
+      // Nihai sonuç bazı seçimi (KURU veya YAŞ)
+      const currentBaz = (rec.baz && String(rec.baz).toUpperCase().includes("YAŞ")) ? "YAŞ" : "KURU";
+      const isLiquid = urunAd.includes("SIVI") || (rec.fiziksel && String(rec.fiziksel).toUpperCase().includes("SIVI"));
+      const fiziksel = rec.fiziksel || (isLiquid ? "SIVI" : "TOZ");
+      const almaYeri = (rec.hat ? rec.hat + " / " : "") + (rec.goz ? rec.goz + " / " : "") + "PAÇAL/";
+      const personel = rec.personel || "EGE DURGUN,HAŞİM ERTEK";
+
+      // 1. Antet HTML - DÜZENLEME TARİHİ ve REVİZYON TARİHİ tek satırda olacak şekilde kilitlendi
+      const headerHtml = `
+        <table class="official-report-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 3.5mm;">
+          <tr>
+            <td rowspan="4" style="width: 140px; text-align: center; padding: 4px 6px; border: 1px solid #000;">
+              <img src="${FERGO_LOGO_B64}" alt="Fergo Logo" style="max-width: 130px; max-height: 44px; display: inline-block;">
+            </td>
+            <td rowspan="4" style="text-align: center; font-size: 13pt; font-weight: bold; letter-spacing: 0.5px; border: 1px solid #000;">
+              ANALİZ RAPORU
+            </td>
+            <td style="font-weight: bold; width: 125px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">DÖKÜMAN NO</td>
+            <td style="text-align: center; width: 80px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">F7.8-0-3.00</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; width: 125px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">DÜZENLEME TARİHİ</td>
+            <td style="text-align: center; width: 80px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">10.02.2026</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; width: 125px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">REVİZYON NO</td>
+            <td style="text-align: center; width: 80px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">-</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold; width: 125px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">REVİZYON TARİHİ</td>
+            <td style="text-align: center; width: 80px; white-space: nowrap; padding: 2px 6px; font-size: 7.5pt; border: 1px solid #000;">-</td>
+          </tr>
+        </table>
+      `;
+
+      // 2. İmza Bloğu HTML - Tam sayfa sığması için optimize yükseklik
+      const signatureHtml = `
+        <table class="official-report-table" style="margin-top: auto; margin-bottom: 2mm; border: 1px solid #000;">
+          <thead>
+            <tr>
+              <th style="width: 33.333%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Analiz Sorumluları</th>
+              <th style="width: 33.333%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Kalite Yöneticisi</th>
+              <th style="width: 33.333%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Laboratuvar Müdürü</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="height: 48px; vertical-align: middle; text-align: center; font-weight: bold; padding: 3px; border: 1px solid #000;">${escapeHtml(personel)}</td>
+              <td style="height: 48px; vertical-align: middle; text-align: center; font-weight: bold; padding: 3px; border: 1px solid #000;">PINAR UYLAŞ AYAR</td>
+              <td style="height: 48px; vertical-align: middle; text-align: center; font-weight: bold; padding: 3px; border: 1px solid #000;">TUNCAY AYAR</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      // 3. Footer HTML - Kuru ve Yaş kısmı nihai baz seçimine göre dinamik değişir
+      const getFooterHtml = (pageNumber) => `
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 8pt; line-height: 1.35; padding-top: 1px;">
+          <div style="text-align: left;">
+            <div>Analiz sonuçları <b>${currentBaz}</b> baza göre verilmiştir.</div>
+            <div><b>GPGDY: Gübrelerin piyasa gözetimi ve denetimi yönetmeliği</b></div>
+          </div>
+          <div style="text-align: right;">
+            <div>Rapor/Numune No: - / <b>${escapeHtml(numuneNo)}</b></div>
+            <div style="font-weight: bold; margin-top: 2px;">Sayfa ${pageNumber} / 2</div>
+          </div>
+        </div>
+      `;
+
+      // 4. Sayfa 2 Analiz Sonuçları Satırlarını Üret
+      // Kural: Standart değerler ürün kartlarında belirtilen değerlerin tolerans uygulanmış hallerinin max. min. şeklinde yazılı değerleri olsun.
+      // Analiz sonuçları virgülden sonra 2 hane olsun ve tolerans durumuna göre sarı/kırmızı ünlem uygulansın.
+      const card = (typeof getProductCard === "function") ? getProductCard(rec.urun || rec.urunAdi) : null;
+      const specs = (typeof parseFertilizerSpecs === "function") ? parseFertilizerSpecs(rec.urun || rec.urunAdi || "") : {};
+      const rows = [];
+
+      Object.entries(OFFICIAL_PARAMETER_CONFIGS).forEach(([key, cfg]) => {
+        let rawVal = (typeof getNihaiValue === "function") ? getNihaiValue(rec, key, currentBaz) : rec[key];
+        if (rawVal === undefined || rawVal === null || rawVal === 0) rawVal = rec[key];
+        if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== "" && String(rawVal).trim() !== "-") {
+          const numVal = parseFloat(String(rawVal).replace(",", "."));
+          if (isNaN(numVal) || numVal <= 0) return;
+
+          // 4.1. Metot Belirleme (Kullanıcı tarafından güncellenebilir metotlar)
+          const customMethods = (typeof getOfficialMethods === "function") ? getOfficialMethods() : {};
+          let methodStr = customMethods[key] || cfg.method;
+          if (key === "thf") {
+            methodStr = isLiquid ? (customMethods["thf_sivi"] || cfg.methodSıvı) : (customMethods["thf_kati"] || cfg.methodKatı);
+          }
+
+          // 4.2. Standart Değer ve Tolerans Hesabı
+          let stdText = "-";
+          let status = "ok"; // "ok", "warning", "danger"
+
+          if (key === "nem") {
+            const cardNem = (card && (card.targetNem !== undefined ? card.targetNem : card.nem) !== undefined) 
+                            ? parseFloat(card.targetNem !== undefined ? card.targetNem : card.nem) 
+                            : (cfg.stdDefault || 35.0);
+            stdText = `${cardNem.toFixed(2)} max.`;
+            if (numVal > cardNem + 1.0) {
+              status = "danger";
+            } else if (numVal > cardNem) {
+              status = "warning";
+            } else {
+              status = "ok";
+            }
+          } else if (key === "ph") {
+            stdText = cfg.stdDefault || "5.00 - 8.00";
+            if (numVal < 4.0 || numVal > 9.0) status = "danger";
+            else if (numVal < 5.0 || numVal > 8.0) status = "warning";
+            else status = "ok";
+          } else if (key === "ec") {
+            const maxEc = (card && card.ec) ? parseFloat(card.ec) : 4.0;
+            stdText = `${maxEc.toFixed(2)} max.`;
+            if (numVal > maxEc) status = "warning";
+          } else if (key === "elek_gt4" || key === "elek_lt2") {
+            // Elek Analizi (>4 mm ve <2 mm) standart değerleri min değil max olmalı ve ona göre değerlendirme yapılmalı
+            let maxLimit = 0;
+            if (card && card[key] !== undefined && card[key] !== null && card[key] !== "") {
+              maxLimit = parseFloat(card[key]);
+            } else if (specs && specs[key] !== undefined && specs[key] !== null && specs[key] !== "") {
+              maxLimit = parseFloat(specs[key]);
+            } else if (cfg.stdDefault !== undefined) {
+              const parsed = parseFloat(String(cfg.stdDefault).replace(/[^0-9.]/g, ""));
+              if (!isNaN(parsed)) maxLimit = parsed;
+            }
+            if (!maxLimit || isNaN(maxLimit) || maxLimit <= 0) {
+              maxLimit = (key === "elek_gt4") ? 2.0 : 3.0;
+            }
+            stdText = `${maxLimit.toFixed(2)} max.`;
+            if (numVal > maxLimit + 0.5) {
+              status = "danger"; // Belirgin limit aşımı (KIRMIZI)
+            } else if (numVal > maxLimit) {
+              status = "warning"; // Hafif limit aşımı (SARI)
+            } else {
+              status = "ok"; // Limit altında veya eşit (Yönetmeliğe ve standarda UYGUN)
+            }
+          } else if (key === "elek_3_4" || key === "elek_2_3") {
+            stdText = "-";
+            status = "ok";
+          } else {
+            // Besin elementleri ve organik parametreler (Minimum Sınır ve Tolerans)
+            let guaranteed = 0;
+            if (card && card[key] !== undefined && card[key] !== null) {
+              guaranteed = parseFloat(card[key]);
+            } else if (specs && specs[key] !== undefined && specs[key] !== null) {
+              guaranteed = parseFloat(specs[key]);
+            } else if (cfg.stdDefault !== undefined) {
+              guaranteed = parseFloat(cfg.stdDefault);
+            }
+
+            if (guaranteed > 0) {
+              let tol = cfg.tol !== undefined ? cfg.tol : 1.1;
+              if (key === "zn") {
+                tol = Math.max(0.2, guaranteed * 0.2);
+              }
+              const minAcceptable = Math.max(0, guaranteed - tol);
+              stdText = `${minAcceptable.toFixed(2)} min.`;
+
+              // Sonuç Değerlendirmesi:
+              if (numVal >= guaranteed) {
+                status = "ok";
+              } else if (numVal >= minAcceptable) {
+                status = "warning"; // Tolerans dahilinde düşük (SARI)
+              } else {
+                status = "danger"; // Tolerans dışı (KIRMIZI)
+              }
+            } else {
+              stdText = "-";
+              status = "ok";
+            }
+          }
+
+          // 4.3. Sonuç Hücresi Biçimlendirme (Virgülden sonra 2 hane + Sarı/Kırmızı Ünlem)
+          const formattedVal = numVal.toFixed(2);
+          let cellResultHtml = `<span style="font-weight: bold; color: #000;">${formattedVal}</span>`;
+
+          if (status === "warning") {
+            // SARI (Amber) Uyarı: Tolerans dahilinde düşük
+            cellResultHtml = `
+              <span style="color: #92400e; font-weight: bold; background-color: #fef3c7; border: 1px solid #fcd34d; padding: 1.5px 5px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; gap: 3px;" title="Tolerans Dahilinde Düşük">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #d97706; font-size: 9px;"></i>
+                <span>${formattedVal} (!)</span>
+              </span>
+            `;
+          } else if (status === "danger") {
+            // KIRMIZI Uyarı: Toleranstan fazla düşük / tolerans dışı
+            cellResultHtml = `
+              <span style="color: #b91c1c; font-weight: bold; background-color: #fee2e2; border: 1px solid #fca5a5; padding: 1.5px 5px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; gap: 3px;" title="Tolerans Dışı / Uygunsuz">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 9px;"></i>
+                <span>${formattedVal} (!)</span>
+              </span>
+            `;
+          }
+
+          rows.push(`
+            <tr>
+              <td style="padding: 6px 8px; font-weight: normal; border: 1px solid #000;">${cfg.name}</td>
+              <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">${cfg.unit}</td>
+              <td style="padding: 6px 8px; border: 1px solid #000;">${methodStr}</td>
+              <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">${cellResultHtml}</td>
+              <td style="padding: 6px 8px; text-align: center; font-weight: 500; border: 1px solid #000;">${stdText}</td>
+            </tr>
+          `);
+        }
+      });
+
+      // Eğer kayıtta parametre bulunamazsa (varsayılan demo)
+      if (rows.length === 0) {
+        rows.push(`
+          <tr>
+            <td style="padding: 6px 8px; border: 1px solid #000;">Nem</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">%</td>
+            <td style="padding: 6px 8px; border: 1px solid #000;">70 °C’de Sabit Ağırlığa Gelene Kadar</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">
+              <span style="color: #b91c1c; font-weight: bold; background-color: #fee2e2; border: 1px solid #fca5a5; padding: 1.5px 5px; border-radius: 3px; display: inline-flex; align-items: center; justify-content: center; gap: 3px;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 9px;"></i>
+                <span>39.75 (!)</span>
+              </span>
+            </td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">35.00 max.</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 8px; border: 1px solid #000;">Organik Madde</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">%</td>
+            <td style="padding: 6px 8px; border: 1px solid #000;">Walkley Black</td>
+            <td style="padding: 6px 8px; text-align: center; font-weight: bold; border: 1px solid #000;">56.53</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">45.00 min.</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 8px; border: 1px solid #000;">Toplam Hümik Fulvik Asit</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">%</td>
+            <td style="padding: 6px 8px; border: 1px solid #000;">TS 5869 ISO 5073/Ocak 2003</td>
+            <td style="padding: 6px 8px; text-align: center; font-weight: bold; border: 1px solid #000;">34.22</td>
+            <td style="padding: 6px 8px; text-align: center; border: 1px solid #000;">25.00 min.</td>
+          </tr>
+        `);
+      }
+
+      container.innerHTML = `
+        <!-- ==================== 1. SAYFA ==================== -->
+        <div class="official-report-sheet">
+          <div>
+            ${headerHtml}
+
+            <!-- NUMUNE TANIMLAMA TABLOSU -->
+            <table class="official-report-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+              <tr>
+                <td style="font-weight: bold; width: 38%; padding: 4.5px 6px; border: 1px solid #000;">Analiz Talep No (Laboratuvar<br>No)</td>
+                <td style="width: 38%; padding: 4.5px 6px; border: 1px solid #000;">-</td>
+                <td style="width: 24%; text-align: center; font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">FERGO</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Talep Eden Tesis (Organo İçi)</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;">GÜBRE TESİSİ</td>
+                <td style="text-align: center; padding: 4.5px 6px; border: 1px solid #000;">-</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Kurum / Firma / Gerçek Kişi<br>(Organo Dışı)</td>
+                <td style="padding: 4.5px 6px; font-weight: bold; border: 1px solid #000;">${escapeHtml(talepEdenFirma)}</td>
+                <td style="text-align: center; font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">${ayYilKodu}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Numune / Etiket Bilgileri</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;">${escapeHtml(urunAd)} /</td>
+                <td rowspan="2" style="text-align: center; padding: 4.5px 6px; border: 1px solid #000;">
+                  <span style="font-weight: bold; display: block; margin-bottom: 2px;">Numune Kodu</span>
+                  <span>${escapeHtml(numuneNo)}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Numunenin Fiziksel Özelliği</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;">${escapeHtml(fiziksel)}</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Numune Alma Yeri/Metodu</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;">${escapeHtml(almaYeri)}</td>
+                <td rowspan="2" style="text-align: center; padding: 4.5px 6px; border: 1px solid #000;">
+                  <span style="font-weight: bold; display: block; margin-bottom: 2px;">Numune Giriş Tarihi</span>
+                  <span>${numuneGirisTarihi}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">E-posta</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;"></td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Telefon/Faks</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;"></td>
+                <td rowspan="2" style="text-align: center; padding: 4.5px 6px; border: 1px solid #000;">
+                  <span style="font-weight: bold; display: block; margin-bottom: 2px;">Analiz Tarihi</span>
+                  <span>${analizTarihi}</span>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; padding: 4.5px 6px; border: 1px solid #000;">Adres</td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;"></td>
+              </tr>
+              <tr>
+                <td style="height: 26px; padding: 4.5px 6px; border: 1px solid #000;"></td>
+                <td style="padding: 4.5px 6px; border: 1px solid #000;"></td>
+                <td style="text-align: center; padding: 4.5px 6px; border: 1px solid #000;">
+                  <span style="font-weight: bold; display: block; margin-bottom: 2px;">Analiz Rapor Tarihi</span>
+                  <span>${analizRaporTarihi}</span>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="3" style="padding: 5px 6px; font-size: 8pt; font-style: italic; vertical-align: top; height: 38pt; border: 1px solid #000;">
+                  Analiz sonuçları ve analiz metotları bu sertifikanın tamamlayıcı kısmı olan takip eden sayfalarda verilmiştir.
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div>
+            ${signatureHtml}
+            ${getFooterHtml(1)}
+          </div>
+        </div>
+
+        <!-- ==================== 2. SAYFA ==================== -->
+        <div class="official-report-sheet">
+          <div>
+            ${headerHtml}
+
+            <!-- ANALİZ SONUÇLARI VE METOTLARI TABLOSU -->
+            <table class="official-report-table" style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+              <thead>
+                <tr style="background: #fff;">
+                  <th style="width: 22%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Analiz Adı</th>
+                  <th style="width: 8%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Birim</th>
+                  <th style="width: 44%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Analiz Metodu</th>
+                  <th style="width: 13%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Analiz<br>Sonucu</th>
+                  <th style="width: 13%; padding: 4px 6px; font-weight: bold; text-align: center; border: 1px solid #000;">Standart<br>Değer</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.join("")}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            ${signatureHtml}
+            ${getFooterHtml(2)}
+          </div>
+        </div>
+      `;
+    }
+
+
+        function viewResultsModal(id) {
       try {
         const rec = labRecords.find(r => r.id == id || String(r.id) === String(id));
         if (!rec) {
@@ -32216,6 +33531,7 @@ function closeModal() {
 
         const modal = document.getElementById("resultsModal");
         if (modal) modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       } catch (err) {
         console.error("viewResultsModal error:", err);
         alert("Analiz bülteni açılırken bir hata oluştu: " + err.message);
@@ -33119,6 +34435,75 @@ function closeModal() {
       if (el) el.value = val;
     }
 
+    
+    // ========================================================
+    // TABLO BAŞLIK FİLTRELERİNİ KALICI HALE GETİRME MOTORU (PERSISTENCE)
+    // ========================================================
+    function saveActiveTableFilters() {
+      try {
+        const state = {};
+        const inputs = document.querySelectorAll("#headerRowFilters input, #headerRowFilters select");
+        let hasColFilter = false;
+        inputs.forEach(el => {
+          if (el.id && el.id.startsWith("f_")) {
+            const v = el.value;
+            if (v !== "" && v !== "ALL" && v !== undefined && v !== null) {
+              state[el.id] = v;
+              hasColFilter = true;
+            }
+          }
+        });
+        if (typeof tableDateFilterState !== "undefined" && (tableDateFilterState.start || tableDateFilterState.end || tableDateFilterState.single)) {
+          state["_tableDateFilterState"] = tableDateFilterState;
+          hasColFilter = true;
+        }
+        if (!hasColFilter) {
+          SafeStorage.removeItem("LAB_ERP_SAVED_COLUMN_FILTERS");
+          return;
+        }
+        SafeStorage.setItem("LAB_ERP_SAVED_COLUMN_FILTERS", JSON.stringify(state));
+      } catch (err) {
+        console.error("saveActiveTableFilters error:", err);
+      }
+    }
+
+    function restoreActiveTableFilters() {
+      try {
+        const raw = SafeStorage.getItem("LAB_ERP_SAVED_COLUMN_FILTERS");
+        if (!raw) return false;
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== "object") return false;
+        let applied = false;
+        Object.entries(state).forEach(([id, val]) => {
+          if (id === "_tableDateFilterState") {
+            if (typeof tableDateFilterState !== "undefined") {
+              tableDateFilterState = val;
+              const lbl = document.getElementById("tableDateFilterLabel");
+              if (lbl && val.displayText) lbl.innerText = val.displayText;
+            }
+            applied = true;
+            return;
+          }
+          if (id === "_activeDateFilter") {
+            if (typeof activeDateFilter !== "undefined") {
+              activeDateFilter = val;
+            }
+            applied = true;
+            return;
+          }
+          const el = document.getElementById(id);
+          if (el) {
+            el.value = val;
+            applied = true;
+          }
+        });
+        return applied;
+      } catch (err) {
+        console.error("restoreActiveTableFilters error:", err);
+        return false;
+      }
+    }
+
     function applyTableFilters() {
       // Tablo başlık filtreleri ile yan panel filtre durumunu iki yönlü senkronize et
       // Tablodan seçilen yeni değer doğrudan aktif filtre ve yan panele yansıtılır
@@ -33476,9 +34861,11 @@ function closeModal() {
       if (countBadge) {
         countBadge.innerText = `${filtered.length} of ${totalCount}`;
       }
+      try { saveActiveTableFilters(); } catch(e) {}
     }
 
     function resetAllColumnFilters() {
+      SafeStorage.removeItem("LAB_ERP_SAVED_COLUMN_FILTERS");
       SIDEBAR_ACTIVE_FILTERS = {};
       activeFacetSectionId = null;
       if (activeWorkspaceAppId !== "app_analiz") {
@@ -33546,6 +34933,7 @@ function closeModal() {
       const modal = document.getElementById("excelImportModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -35874,6 +37262,7 @@ function closeModal() {
         if (searchInput) searchInput.value = "";
         renderProductCardsTableRows();
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       } catch (err) {
         console.error("openProductCardsTableModal hatası:", err);
@@ -36093,10 +37482,16 @@ function closeModal() {
       initProductCardInputSync();
       updateProductCardUIStates();
       modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
       modal.style.display = "flex";
     }
 
-    function closeProductCardModal() {
+    function closeProductCardModal(force = false) {
+      if (!force && isModalDirty("productCardModal")) {
+        showUnsavedChangesPrompt("productCardModal");
+        return;
+      }
+      clearModalDirty("productCardModal");
       const modal = document.getElementById("productCardModal");
       if (modal) {
         modal.classList.add("hidden");
@@ -36775,6 +38170,7 @@ function closeModal() {
       const modal = document.getElementById("productNitrogenConfigModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
     }
@@ -37278,6 +38674,7 @@ function closeModal() {
       const modal = document.getElementById("masterDataModal");
       if (modal) {
         modal.classList.remove("hidden");
+      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.style.display = "flex";
       }
       switchMasterTab(initialTab);
@@ -40424,6 +41821,12 @@ function renderCustomFieldsInEntryModal() {
           <button type="button" onclick="closeRowActionMenu(); viewResultsModal('${rec.id}');" class="flex items-center gap-2.5 w-full text-left px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 text-xs font-medium transition cursor-pointer">
             <i class="fa-solid fa-square-poll-vertical text-emerald-600 w-4 text-center"></i>
             <span>Analiz Sonuç Bülteni</span>
+          </button>
+
+          <!-- 2.1. Resmi Analiz Raporu (F7.8-0-3.00) -->
+          <button type="button" onclick="closeRowActionMenu(); openOfficialReportModal('${rec.id}');" class="flex items-center gap-2.5 w-full text-left px-2.5 py-1.5 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 text-xs font-medium transition cursor-pointer">
+            <i class="fa-solid fa-file-pdf text-rose-600 w-4 text-center"></i>
+            <span class="font-semibold text-blue-900">Resmi Analiz Raporu (F7.8)</span>
           </button>
 
           <div class="my-1 border-t border-slate-100"></div>
