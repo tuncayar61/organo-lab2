@@ -635,6 +635,24 @@
       display: none !important;
     }
 
+    #officialReportModal {
+      z-index: 9999999 !important;
+      position: fixed !important;
+      inset: 0 !important;
+    }
+    #officialReportModal.hidden {
+      display: none !important;
+    }
+
+    #analysisMethodsModal {
+      z-index: 600000 !important;
+      position: fixed !important;
+      inset: 0 !important;
+    }
+    #analysisMethodsModal.hidden {
+      display: none !important;
+    }
+
     /* Canlı Form Ekleme ve Gizlenen Alanlar Pencereleri (Daima En Üst Katmanda) */
     #liveAddFieldModal,
     #liveHiddenFieldsModal {
@@ -1587,6 +1605,11 @@
           </div>
         </div>
         <div class="flex items-center space-x-2">
+          <!-- RESMİ ANALİZ RAPORU (F7.8-0-3.00) BUTONU -->
+          <button type="button" id="btnModalOfficialReportHeader" onclick="openOfficialReportFromCurrentModal()" class="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-blue-400/30 cursor-pointer" title="Bu Kaydın Resmi Analiz Raporunu (F7.8-0-3.00) Görüntüle ve Yazdır">
+            <i class="fa-solid fa-file-contract text-blue-200"></i>
+            <span>Resmi Analiz Raporu</span>
+          </button>
           <button type="button" id="btnModalToggleModifierHeader" onclick="openTableModifierModal(event)" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-purple-400/30 cursor-pointer" title="Şablonu ve Form Alanlarını Modifiye Et" tabindex="-1">
             <i class="fa-solid fa-shapes text-purple-300"></i>
             <span>Şablonu Modifiye Et</span>
@@ -3114,7 +3137,7 @@
   <!-- ========================================================
        4. MODAL: RESMİ ANALİZ METOTLARI YÖNETİM MODALI (F7.1-0-5)
        ======================================================== -->
-  <div id="analysisMethodsModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[10020] flex items-center justify-center p-3 overflow-y-auto hidden">
+  <div id="analysisMethodsModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[600000] flex items-center justify-center p-3 overflow-y-auto hidden" style="z-index: 600000 !important; display: none;">
     <div class="max-w-3xl w-full bg-white rounded-2xl shadow-2xl border border-slate-300 flex flex-col max-h-[92vh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
       
       <!-- Modal Başlığı -->
@@ -3174,7 +3197,7 @@
 <!-- ========================================================
        3. MODAL: FERGO RESMİ ANALİZ RAPORU (F7.8-0-3.00) MODALI
        ======================================================== -->
-  <div id="officialReportModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[10000] flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden">
+  <div id="officialReportModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[500000] flex flex-col items-center justify-start p-2 sm:p-4 overflow-y-auto hidden" style="z-index: 500000 !important; display: none;">
     <!-- Üst Kontrol Çubuğu (no-print) -->
     <div class="sticky top-0 z-50 bg-slate-900/90 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center justify-between gap-4 max-w-4xl w-full mb-4 border border-slate-700 no-print">
       <div class="flex items-center space-x-2.5">
@@ -21660,6 +21683,11 @@ function openTableModifierModal(e) {
             </div>
           </div>
           <div class="flex items-center space-x-2">
+            <!-- RESMİ ANALİZ RAPORU (F7.8-0-3.00) BUTONU -->
+            <button type="button" id="btnModalOfficialReportHeader" onclick="openOfficialReportFromCurrentModal()" class="bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-blue-400/30 cursor-pointer" title="Bu Kaydın Resmi Analiz Raporunu (F7.8-0-3.00) Görüntüle ve Yazdır">
+              <i class="fa-solid fa-file-contract text-blue-200"></i>
+              <span>Resmi Analiz Raporu</span>
+            </button>
             <button type="button" id="btnModalToggleModifierHeader" onclick="openTableModifierModal(event)" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-purple-400/30 cursor-pointer" title="Şablonu ve Form Alanlarını Modifiye Et" tabindex="-1">
               <i class="fa-solid fa-shapes text-purple-300"></i>
               <span>Şablonu Modifiye Et</span>
@@ -23770,10 +23798,43 @@ async function initializeLabErpApp() {
       if (!rec) return 0;
       const baz = targetBaz || rec.baz || "KURU";
       let yasVal = 0;
-      if (rec.entered_yas && rec.entered_yas[key] !== undefined && rec.entered_yas[key] !== null && rec.entered_yas[key] !== "") {
-        yasVal = parseFloat(rec.entered_yas[key]);
-      } else if (rec[key] !== undefined && rec[key] !== null && rec[key] !== "") {
-        yasVal = parseFloat(rec[key]);
+
+      const aliasMap = {
+        "nh4N": ["nh4N", "nh4", "nh4_n", "targetNH4"],
+        "no3N": ["no3N", "no3", "no3_n", "targetNO3"],
+        "ureN": ["ureN", "ure", "ure_n", "targetUre"],
+        "topAzot": ["topAzot", "top_azot", "azot"],
+        "tkn": ["tkn", "tkn_n", "targetTkn"],
+        "topP2O5": ["topP2O5", "top_p2o5", "p2o5"],
+        "sudaP2O5": ["sudaP2O5", "suda_p2o5"],
+        "topK2O": ["topK2O", "top_k2o", "k2o"],
+        "sudaK2O": ["sudaK2O", "suda_k2o"],
+        "topSO3": ["topSO3", "top_so3", "so3"],
+        "sudaSO3": ["sudaSO3", "suda_so3"],
+        "zn": ["zn", "cinko"],
+        "om": ["om", "organik"],
+        "thf": ["thf", "humik"],
+        "nem": ["nem", "targetNem"],
+        "ph": ["ph"],
+        "ec": ["ec"]
+      };
+      const checkKeys = aliasMap[key] || [key];
+
+      if (rec.entered_yas) {
+        for (const k of checkKeys) {
+          if (rec.entered_yas[k] !== undefined && rec.entered_yas[k] !== null && rec.entered_yas[k] !== "") {
+            const v = parseFloat(rec.entered_yas[k]);
+            if (!isNaN(v) && v > 0) { yasVal = v; break; }
+          }
+        }
+      }
+      if (isNaN(yasVal) || yasVal === 0) {
+        for (const k of checkKeys) {
+          if (rec[k] !== undefined && rec[k] !== null && rec[k] !== "") {
+            const v = parseFloat(rec[k]);
+            if (!isNaN(v) && v > 0) { yasVal = v; break; }
+          }
+        }
       }
 
       // Eğer doğrudan yaş veya nihai değer bulunamadıysa ama titrasyon tartım ve sarfiyatı varsa otomatik hesapla!
@@ -32337,7 +32398,9 @@ function closeModal(force = false) {
       const modal = document.getElementById("analysisMethodsModal");
       if (modal) {
         modal.classList.remove("hidden");
-      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
+        modal.style.display = "flex";
+        modal.style.zIndex = "600000";
+        if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.scrollTop = 0;
       }
     }
@@ -32349,7 +32412,10 @@ function closeModal(force = false) {
       }
       clearModalDirty("analysisMethodsModal");
       const modal = document.getElementById("analysisMethodsModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+      }
     }
 
     function renderAnalysisMethodsForm() {
@@ -32479,6 +32545,7 @@ function closeModal(force = false) {
 
     // F7.1-0-5 Analiz Hizmet Kapsamı Formu Resmi Metotları
     const OFFICIAL_PARAMETER_CONFIGS = {
+      // 1. FİZİKSEL ANALİZLER (Tablo Sırasıyla)
       "nem": { 
         name: "Nem", 
         unit: "%", 
@@ -32487,24 +32554,6 @@ function closeModal(force = false) {
         stdDefault: 35.0, 
         tol: 0 
       },
-      "om": { 
-        name: "Organik Madde", 
-        unit: "%", 
-        method: "Walkley Black", 
-        isMax: false, 
-        stdDefault: 45.0, 
-        tol: 1.1 
-      },
-      "thf": { 
-        name: "Toplam Hümik Fulvik Asit", 
-        unit: "%", 
-        methodKatı: "TS 5869 ISO 5073/Ocak 2003", 
-        methodSıvı: "HA4/JC (CDFA California Method)", 
-        method: "TS 5869 ISO 5073/Ocak 2003", 
-        isMax: false, 
-        stdDefault: 25.0, 
-        tol: 1.1 
-      },
       "ph": { 
         name: "pH Tayini", 
         unit: "-", 
@@ -32512,21 +32561,38 @@ function closeModal(force = false) {
         isRange: true, 
         stdDefault: "5.00 - 8.00" 
       },
-      "ec": { 
-        name: "EC Tayini", 
-        unit: "mS/cm", 
-        method: "1/10 Sulu Çözeltide", 
+      "elek_gt4": { 
+        name: "Elek Analizi (>4 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
         isMax: true, 
-        stdDefault: 4.0, 
+        stdDefault: "2.00 max.", 
         tol: 0 
       },
-      "yogunluk": { 
-        name: "Yoğunluk", 
-        unit: "g/cm³", 
-        method: "Katılarda Dökme Yoğunluk / Sıvılarda Sıvı Yoğunluğu", 
+      "elek_3_4": { 
+        name: "Elek Analizi (3-4 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
         isRange: true, 
         stdDefault: "-" 
       },
+      "elek_2_3": { 
+        name: "Elek Analizi (2-3 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isRange: true, 
+        stdDefault: "-" 
+      },
+      "elek_lt2": { 
+        name: "Elek Analizi (<2 mm)", 
+        unit: "%", 
+        method: "TS 1385 Kuru Eleme", 
+        isMax: true, 
+        stdDefault: "3.00 max.", 
+        tol: 0 
+      },
+
+      // 2. AZOT GRUBU (Tablo Sırasıyla)
       "topAzot": { 
         name: "Toplam Azot", 
         unit: "%", 
@@ -32562,6 +32628,8 @@ function closeModal(force = false) {
         isMax: false, 
         tol: 1.1 
       },
+
+      // 3. FOSFOR GRUBU (Tablo Sırasıyla)
       "topP2O5": { 
         name: "Toplam P2O5", 
         unit: "%", 
@@ -32576,6 +32644,8 @@ function closeModal(force = false) {
         isMax: false, 
         tol: 1.1 
       },
+
+      // 4. POTASYUM GRUBU (Tablo Sırasıyla)
       "topK2O": { 
         name: "Toplam K2O", 
         unit: "%", 
@@ -32590,6 +32660,8 @@ function closeModal(force = false) {
         isMax: false, 
         tol: 1.1 
       },
+
+      // 5. KÜKÜRT GRUBU (Tablo Sırasıyla)
       "topSO3": { 
         name: "Toplam SO3", 
         unit: "%", 
@@ -32604,6 +32676,8 @@ function closeModal(force = false) {
         isMax: false, 
         tol: 0.9 
       },
+
+      // 6. İZ VE MİKRO ELEMENTLER (Çinko, Bor)
       "zn": { 
         name: "Çinko (Zn)", 
         unit: "%", 
@@ -32618,6 +32692,8 @@ function closeModal(force = false) {
         isMax: false, 
         tol: 0.2 
       },
+
+      // 7. İKİNCİL MAKRO ELEMENTLER (Kalsiyum, Magnezyum, Sodyum)
       "ca": { 
         name: "Toplam Kalsiyum", 
         unit: "%", 
@@ -32660,35 +32736,42 @@ function closeModal(force = false) {
         isMax: true, 
         tol: 0 
       },
-      "elek_gt4": { 
-        name: "Elek Analizi (>4 mm)", 
+
+      // 8. ORGANİK BİLEŞENLER (Tablo Sırasıyla)
+      "om": { 
+        name: "Organik Madde", 
         unit: "%", 
-        method: "TS 1385 Kuru Eleme", 
+        method: "Walkley Black", 
+        isMax: false, 
+        stdDefault: 45.0, 
+        tol: 1.1 
+      },
+      "thf": { 
+        name: "Toplam Hümik Fulvik Asit", 
+        unit: "%", 
+        methodKatı: "TS 5869 ISO 5073/Ocak 2003", 
+        methodSıvı: "HA4/JC (CDFA California Method)", 
+        method: "TS 5869 ISO 5073/Ocak 2003", 
+        isMax: false, 
+        stdDefault: 25.0, 
+        tol: 1.1 
+      },
+
+      // 9. DİĞER FİZİKSEL & KİMYASAL TAYİNLER
+      "ec": { 
+        name: "EC Tayini", 
+        unit: "mS/cm", 
+        method: "1/10 Sulu Çözeltide", 
         isMax: true, 
-        stdDefault: "2.00 max.", 
+        stdDefault: 4.0, 
         tol: 0 
       },
-      "elek_3_4": { 
-        name: "Elek Analizi (3-4 mm)", 
-        unit: "%", 
-        method: "TS 1385 Kuru Eleme", 
+      "yogunluk": { 
+        name: "Yoğunluk", 
+        unit: "g/cm³", 
+        method: "Katılarda Dökme Yoğunluk / Sıvılarda Sıvı Yoğunluğu", 
         isRange: true, 
         stdDefault: "-" 
-      },
-      "elek_2_3": { 
-        name: "Elek Analizi (2-3 mm)", 
-        unit: "%", 
-        method: "TS 1385 Kuru Eleme", 
-        isRange: true, 
-        stdDefault: "-" 
-      },
-      "elek_lt2": { 
-        name: "Elek Analizi (<2 mm)", 
-        unit: "%", 
-        method: "TS 1385 Kuru Eleme", 
-        isMax: true, 
-        stdDefault: "3.00 max.", 
-        tol: 0 
       }
     };
 
@@ -32758,8 +32841,60 @@ function closeModal(force = false) {
       }
     }
 
+    
+    var returnToEntryModalAfterOfficialReport = false;
+    window.returnToEntryModalAfterOfficialReport = false;
+
+    function openOfficialReportFromCurrentModal() {
+      let targetId = (typeof currentEditingId !== "undefined") ? currentEditingId : null;
+      if (typeof isModalDirty === "function" && isModalDirty("entryModal")) {
+        try {
+          if (typeof saveModalForm === "function") saveModalForm(true);
+          targetId = currentEditingId;
+        } catch(e) {
+          console.error("openOfficialReportFromCurrentModal save error:", e);
+        }
+      }
+      if (!targetId) {
+        try {
+          if (typeof saveModalForm === "function") saveModalForm(true);
+          targetId = currentEditingId;
+        } catch(e) {
+          console.error("save error:", e);
+        }
+      }
+      if (!targetId) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Rapor oluşturabilmek için lütfen önce kaydı kaydedin.");
+        }
+        return;
+      }
+
+      // Rapor penceresinin kayıt düzenleme ekranının altında kalmaması için
+      // Kayıt düzenleme modalını geçici olarak gizle ve rapor kapandığında geri aç
+      returnToEntryModalAfterOfficialReport = true;
+      const entryModal = document.getElementById("entryModal");
+      if (entryModal) {
+        entryModal.classList.add("hidden");
+        entryModal.style.display = "none";
+      }
+
+      if (typeof openOfficialReportModal === "function") {
+        openOfficialReportModal(targetId);
+      }
+    }
+    window.openOfficialReportFromCurrentModal = openOfficialReportFromCurrentModal;
+
     function openOfficialReportModal(recId) {
       if (!recId) return;
+
+      // Kayıt düzenleme modalı açıksa, raporun arkasında kalmasını önlemek için geçici olarak gizle
+      const entryModal = document.getElementById("entryModal");
+      if (entryModal && !entryModal.classList.contains("hidden") && entryModal.style.display !== "none") {
+        returnToEntryModalAfterOfficialReport = true;
+        entryModal.classList.add("hidden");
+        entryModal.style.display = "none";
+      }
       const rec = (labRecords || []).find(r => String(r.id) === String(recId)) ||
                   (deletedRecords || []).find(r => String(r.id) === String(recId)) ||
                   (typeof DEFAULT_LAB_RECORDS !== "undefined" ? DEFAULT_LAB_RECORDS.find(r => String(r.id) === String(recId)) : null);
@@ -32797,16 +32932,36 @@ function closeModal(force = false) {
 
       const modal = document.getElementById("officialReportModal");
       if (modal) {
+        // En üst katmanda olmasını garanti etmek için body sonuna taşı ve yüksek z-index ver
+        if (modal.parentElement !== document.body) {
+          document.body.appendChild(modal);
+        }
         modal.classList.remove("hidden");
-      if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
+        modal.style.display = "flex";
+        modal.style.zIndex = "9999999";
+        if (modal.id) setTimeout(() => { clearModalDirty(modal.id); }, 50);
         modal.scrollTop = 0;
       }
     }
 
     function closeOfficialReportModal() {
       const modal = document.getElementById("officialReportModal");
-      if (modal) modal.classList.add("hidden");
+      if (modal) {
+        modal.classList.add("hidden");
+        modal.style.display = "none";
+      }
       document.body.classList.remove("printing-official-report");
+
+      // Eğer kayıt düzenleme ekranından açıldıysa, kayıt ekranını kusursuz şekilde geri getir
+      if (typeof returnToEntryModalAfterOfficialReport !== "undefined" && returnToEntryModalAfterOfficialReport) {
+        returnToEntryModalAfterOfficialReport = false;
+        const entryModal = document.getElementById("entryModal");
+        if (entryModal) {
+          entryModal.classList.remove("hidden");
+          entryModal.style.display = "flex";
+          entryModal.scrollTop = 0;
+        }
+      }
     }
 
     
@@ -32930,9 +33085,45 @@ function closeModal(force = false) {
       const specs = (typeof parseFertilizerSpecs === "function") ? parseFertilizerSpecs(rec.urun || rec.urunAdi || "") : {};
       const rows = [];
 
-      Object.entries(OFFICIAL_PARAMETER_CONFIGS).forEach(([key, cfg]) => {
+      // Tablodaki güncel sütun sıralamasını al (resmi rapordaki sıralama tablodaki ile birebir aynı olur)
+      const tableOrderList = (typeof getActiveDisplayFields === "function") 
+        ? getActiveDisplayFields().map(f => f.key) 
+        : [];
+      
+      const officialEntries = Object.entries(OFFICIAL_PARAMETER_CONFIGS);
+      officialEntries.sort((a, b) => {
+        const keyA = a[0];
+        const keyB = b[0];
+        const idxA = tableOrderList.indexOf(keyA);
+        const idxB = tableOrderList.indexOf(keyB);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0; // OFFICIAL_PARAMETER_CONFIGS varsayılan sıralamasını koru
+      });
+
+      officialEntries.forEach(([key, cfg]) => {
+        // Ürün kartında Toplam Azot için tik işaretli değilse analiz raporlarında basılmasın!
+        if (key === "topAzot" && card && card.hasTopAzot === false) {
+          return;
+        }
+
         let rawVal = (typeof getNihaiValue === "function") ? getNihaiValue(rec, key, currentBaz) : rec[key];
-        if (rawVal === undefined || rawVal === null || rawVal === 0) rawVal = rec[key];
+        if (rawVal === undefined || rawVal === null || rawVal === 0) {
+          const rawAliases = {
+            "nh4N": ["nh4N", "nh4", "nh4_n"],
+            "no3N": ["no3N", "no3", "no3_n"],
+            "ureN": ["ureN", "ure", "ure_n"],
+            "topAzot": ["topAzot", "top_azot", "azot"],
+            "zn": ["zn", "cinko", "m_zn_yas", "targetZn"],
+            "b": ["b", "bor", "targetB"]
+          }[key] || [key];
+          for (const ak of rawAliases) {
+            if (rec[ak] !== undefined && rec[ak] !== null && rec[ak] !== "" && parseFloat(rec[ak]) > 0) {
+              rawVal = rec[ak]; break;
+            }
+          }
+        }
         if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== "" && String(rawVal).trim() !== "-") {
           const numVal = parseFloat(String(rawVal).replace(",", "."));
           if (isNaN(numVal) || numVal <= 0) return;
@@ -32995,31 +33186,81 @@ function closeModal(force = false) {
             stdText = "-";
             status = "ok";
           } else {
-            // Besin elementleri ve organik parametreler (Minimum Sınır ve Tolerans)
+            // Besin elementleri ve organik parametreler (Garanti Edilen Standart ve Tolerans)
             let guaranteed = 0;
-            if (card && card[key] !== undefined && card[key] !== null) {
-              guaranteed = parseFloat(card[key]);
-            } else if (specs && specs[key] !== undefined && specs[key] !== null) {
-              guaranteed = parseFloat(specs[key]);
-            } else if (cfg.stdDefault !== undefined) {
+            const paramAliasMap = {
+              "nh4N": ["targetNH4", "nh4", "nh4N", "nh4_n", "target_nh4"],
+              "no3N": ["targetNO3", "no3", "no3N", "no3_n", "target_no3"],
+              "ureN": ["targetUre", "ure", "ureN", "ure_n", "target_ure"],
+              "tkn": ["targetTkn", "tkn", "tknN", "tkn_n", "target_tkn"],
+              "topAzot": ["topAzot", "azot", "top_azot", "targetTopAzot", "targetAzot"],
+              "topP2O5": ["topP2O5", "p2o5", "top_p2o5"],
+              "sudaP2O5": ["sudaP2O5", "suda_p2o5"],
+              "topK2O": ["topK2O", "k2o", "top_k2o"],
+              "sudaK2O": ["sudaK2O", "suda_k2o"],
+              "topSO3": ["topSO3", "so3", "top_so3"],
+              "sudaSO3": ["sudaSO3", "suda_so3"],
+              "zn": ["zn", "cinko", "targetZn", "target_zn"],
+              "b": ["b", "bor", "targetB", "target_b"],
+              "ca": ["ca", "kalsiyum", "targetCa"],
+              "sudaCa": ["sudaCa", "suda_ca"],
+              "mg": ["mg", "magnezyum", "targetMg"],
+              "sudaMg": ["sudaMg", "suda_mg"],
+              "na": ["na", "sodyum", "targetNa"],
+              "sudaNa": ["sudaNa", "suda_na"],
+              "om": ["om", "organik", "targetOm"],
+              "thf": ["thf", "humik", "targetThf"],
+              "nem": ["targetNem", "nem"],
+              "ec": ["ec"],
+              "ph": ["ph"]
+            };
+            const checkKeys = paramAliasMap[key] || [key];
+
+            if (card) {
+              for (const k of checkKeys) {
+                if (card[k] !== undefined && card[k] !== null && card[k] !== "" && !isNaN(parseFloat(card[k]))) {
+                  const v = parseFloat(card[k]);
+                  if (v > 0) { guaranteed = v; break; }
+                }
+              }
+            }
+            if (!guaranteed && specs) {
+              for (const k of checkKeys) {
+                if (specs[k] !== undefined && specs[k] !== null && specs[k] !== "" && !isNaN(parseFloat(specs[k]))) {
+                  const v = parseFloat(specs[k]);
+                  if (v > 0) { guaranteed = v; break; }
+                }
+              }
+            }
+            if (!guaranteed && cfg.stdDefault !== undefined && !isNaN(parseFloat(cfg.stdDefault))) {
               guaranteed = parseFloat(cfg.stdDefault);
             }
 
             if (guaranteed > 0) {
+              // Standart Değer Sütunu: Ürün kartında garanti edilen spesifikasyon değeri yazılır!
+              let stdDisplayVal = "";
+              if (guaranteed < 1 && guaranteed > 0 && Math.floor(guaranteed * 10) === 0) {
+                // Çinko ve Bor gibi mikro elementlerde virgülden sonra 0 geliyorsa (örn: 0,096) 3 hane
+                stdDisplayVal = guaranteed.toFixed(3);
+              } else {
+                stdDisplayVal = guaranteed.toFixed(2);
+              }
+              stdText = `${stdDisplayVal} min.`;
+
+              // Tolerans Hesabı ve Yönetmelik Uygunluk Değerlendirmesi:
               let tol = cfg.tol !== undefined ? cfg.tol : 1.1;
-              if (key === "zn") {
-                tol = Math.max(0.2, guaranteed * 0.2);
+              if (key === "zn" || key === "b") {
+                // Mikro elementlerde oransal tolerans (%20 veya max 0.2)
+                tol = Math.min(0.2, guaranteed * 0.20);
               }
               const minAcceptable = Math.max(0, guaranteed - tol);
-              stdText = `${minAcceptable.toFixed(2)} min.`;
 
-              // Sonuç Değerlendirmesi:
               if (numVal >= guaranteed) {
-                status = "ok";
+                status = "ok"; // Standarda tam uygun (YEŞİL)
               } else if (numVal >= minAcceptable) {
-                status = "warning"; // Tolerans dahilinde düşük (SARI)
+                status = "warning"; // Tolerans dahilinde kabul edilebilir (SARI)
               } else {
-                status = "danger"; // Tolerans dışı (KIRMIZI)
+                status = "danger"; // Tolerans dışı uygunsuz (KIRMIZI)
               }
             } else {
               stdText = "-";
@@ -33027,8 +33268,13 @@ function closeModal(force = false) {
             }
           }
 
-          // 4.3. Sonuç Hücresi Biçimlendirme (Virgülden sonra 2 hane + Sarı/Kırmızı Ünlem)
-          const formattedVal = numVal.toFixed(2);
+          // 4.3. Sonuç Hücresi Biçimlendirme (çinko gibi 1'den küçük değere sahip sonuçlarda virgülden sonra yine 0 geliyorsa 3 hane, diğer durumlarda 2 hane)
+          let formattedVal = "";
+          if (numVal < 1 && numVal > 0 && Math.floor(numVal * 10) === 0) {
+            formattedVal = numVal.toFixed(3);
+          } else {
+            formattedVal = numVal.toFixed(2);
+          }
           let cellResultHtml = `<span style="font-weight: bold; color: #000;">${formattedVal}</span>`;
 
           if (status === "warning") {
@@ -37584,6 +37830,7 @@ function closeModal(force = false) {
       };
 
       setVal("pc_name", data.name || "");
+      setChk("pc_has_top_azot", (data.hasTopAzot !== undefined) ? !!data.hasTopAzot : ((data.topAzot > 0) || !!data.hasNH4 || !!data.hasNO3 || !!data.hasUre));
       setNum("pc_top_azot", data.topAzot, 2);
       setNum("pc_top_p2o5", data.topP2O5, 2);
       setNum("pc_suda_p2o5", data.sudaP2O5, 2);
@@ -37672,6 +37919,8 @@ function closeModal(force = false) {
         if (el) el.value = estVal > 0 ? formatTRNumber(estVal, dec) : "";
       };
 
+      const chkTopAzot = document.getElementById("pc_has_top_azot");
+      if (chkTopAzot) chkTopAzot.checked = (estimated.hasTopAzot !== undefined) ? !!estimated.hasTopAzot : (estimated.topAzot > 0);
       setFormatted("pc_top_azot", estimated.topAzot, 2);
       setFormatted("pc_top_p2o5", estimated.topP2O5, 2);
       setFormatted("pc_suda_p2o5", estimated.sudaP2O5, 2);
@@ -37856,6 +38105,30 @@ function closeModal(force = false) {
       });
     }
 
+    
+    function onProductCardTopAzotToggle() {
+      const chk = document.getElementById("pc_has_top_azot");
+      const inp = document.getElementById("pc_top_azot");
+      if (!chk || !inp) return;
+      if (!chk.checked) {
+        // Tik kaldırıldı
+      } else {
+        recalculateProductCardTotalNitrogen();
+      }
+    }
+    window.onProductCardTopAzotToggle = onProductCardTopAzotToggle;
+
+    function onProductCardTopAzotInput() {
+      const chk = document.getElementById("pc_has_top_azot");
+      const inp = document.getElementById("pc_top_azot");
+      if (chk && inp) {
+        const num = parseTRNumber(inp.value);
+        if (num > 0) chk.checked = true;
+      }
+      recalculateProductCardTotalNitrogen();
+    }
+    window.onProductCardTopAzotInput = onProductCardTopAzotInput;
+
     function recalculateProductCardTotalNitrogen() {
       const hasTkn = document.getElementById("pc_has_tkn")?.checked;
       const hasNH4 = document.getElementById("pc_has_nh4")?.checked;
@@ -37984,7 +38257,7 @@ function closeModal(force = false) {
         zn: parseTRNumber(document.getElementById("pc_zn")?.value),
         om: parseTRNumber(document.getElementById("pc_om")?.value),
         thf: parseTRNumber(document.getElementById("pc_thf")?.value),
-        hasTopAzot: (parseTRNumber(document.getElementById("pc_top_azot")?.value) > 0 || hasNH4 || hasNO3 || hasUre || hasOrg),
+        hasTopAzot: (document.getElementById("pc_has_top_azot") ? document.getElementById("pc_has_top_azot").checked : (parseTRNumber(document.getElementById("pc_top_azot")?.value) > 0)),
         hasNH4: hasNH4,
         targetNH4: parseTRNumber(document.getElementById("pc_target_nh4")?.value),
         hasNO3: hasNO3,
@@ -39589,8 +39862,7 @@ function closeModal(force = false) {
       const cleanKey = fieldKey.replace(/^col-/, "");
       const f = templateFields.find(x => x.key === cleanKey || x.id === cleanKey || x.key === fieldKey || x.id === fieldKey);
       if (f && typeof f.decimals === "number" && !isNaN(f.decimals)) return f.decimals;
-      if (cleanKey === "zn") return 3;
-      if (cleanKey === "ph" || cleanKey === "om" || cleanKey === "thf") return 1;
+            if (cleanKey === "ph" || cleanKey === "om" || cleanKey === "thf") return 1;
       if (cleanKey === "sira" || cleanKey === "id") return 0;
       return 2;
     }
@@ -39641,7 +39913,15 @@ function closeModal(force = false) {
       }
       const num = parseTRNumber(val);
       if (isNaN(num) || num <= 0) return "";
-      const dec = getFieldDecimals(fieldKey);
+      let dec = getFieldDecimals(fieldKey);
+      // çinko gibi 1'den küçük değere sahip sonuçları virgülden sonra yine 0 geliyorsa mesela 0,096 virgülden sonra 3 hane göster diğer durumlarda 2 hane:
+      if (fieldKey === "zn" || fieldKey === "b" || num < 1) {
+        if (num < 1 && Math.floor(num * 10) === 0) {
+          dec = 3;
+        } else {
+          dec = 2;
+        }
+      }
       return num.toFixed(dec).replace(".", ",");
     }
 
@@ -43030,13 +43310,16 @@ function renderCustomFieldsInEntryModal() {
             </span>
           </div>
 
-          <!-- Toplam Azot Alanı (Türevlerden otomatik toplanır) -->
+          <!-- Toplam Azot Alanı (Tikli & Türevlerden otomatik toplanır) -->
           <div class="mb-3.5 bg-white p-2.5 rounded-lg border border-blue-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-            <div class="flex items-center space-x-2">
-              <span class="text-xs font-bold text-blue-950">Toplam Azot (N %):</span>
-              <input type="text" inputmode="decimal" id="pc_top_azot" oninput="recalculateProductCardTotalNitrogen()" placeholder="0.00" class="w-24 p-1.5 border border-blue-300 rounded bg-blue-50/80 font-bold text-blue-950 text-xs text-center" title="Türevlerden otomatik hesaplanır">
+            <div class="flex items-center space-x-2.5">
+              <label class="flex items-center space-x-2 cursor-pointer" title="İşaretli değilse analiz raporlarında basılmaz">
+                <input type="checkbox" id="pc_has_top_azot" onchange="onProductCardTopAzotToggle()" class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer" checked>
+                <span class="text-xs font-bold text-blue-950">Toplam Azot (N %)</span>
+              </label>
+              <input type="text" inputmode="decimal" id="pc_top_azot" oninput="onProductCardTopAzotInput()" placeholder="0.00" class="w-24 p-1.5 border border-blue-300 rounded bg-blue-50/80 font-bold text-blue-950 text-xs text-center" title="Türevlerden otomatik hesaplanır">
               <span class="text-[11px] text-blue-600 font-semibold italic flex items-center gap-1">
-                <i class="fa-solid fa-calculator text-[10px]"></i> Türevlerden otomatik toplanır
+                <i class="fa-solid fa-calculator text-[10px]"></i> Türevlerden toplanır (Tik işaretli değilse analiz raporlarında basılmaz)
               </span>
             </div>
           </div>
