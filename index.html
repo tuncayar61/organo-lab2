@@ -1697,8 +1697,8 @@
                 <span>+ 1. Kısma Açılır Liste Ekle</span>
               </button>
             </div>
-            <!-- Kategori Sıralama Kontrolleri -->
-            <div class="flex items-center space-x-1 shrink-0">
+            <!-- Kategori Sıralama Kontrolleri (Yalnızca Şablon Modifiye Modunda Görünür) -->
+            <div class="category-modifier-controls hidden flex items-center space-x-1 shrink-0">
               <span class="text-[9.5px] font-bold text-slate-500 hidden sm:inline mr-0.5">Kategori:</span>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionGenel', -1)" class="w-6 h-6 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionGenel', 1)" class="w-6 h-6 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
@@ -2039,8 +2039,8 @@
               </h4>
               <span class="text-[10px] text-amber-700 italic hidden sm:inline">KM = 100 - Nem</span>
             </div>
-            <!-- Kategori Sıralama Kontrolleri -->
-            <div class="flex items-center space-x-1 shrink-0">
+            <!-- Kategori Sıralama Kontrolleri (Yalnızca Şablon Modifiye Modunda Görünür) -->
+            <div class="category-modifier-controls hidden flex items-center space-x-1 shrink-0">
               <span class="text-[9.5px] font-bold text-amber-900 hidden sm:inline mr-0.5">Kategori:</span>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionFiziksel', -1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionFiziksel', 1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
@@ -2195,8 +2195,8 @@
               <button type="button" onclick="openProductNitrogenConfigModal()" class="text-[10.5px] bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold px-2.5 py-1 rounded-md border border-blue-300 flex items-center gap-1.5 transition shadow-2xs" title="Bu gübrenin içerdiği azot türevlerini (Amonyum, Nitrat, Üre vb.) belirle" tabindex="-1">
                 <i class="fa-solid fa-sliders text-xs"></i> <span>Azot Türevlerini Belirle</span>
               </button>
-              <!-- Kategori Sıralama Kontrolleri -->
-              <div class="flex items-center space-x-1 shrink-0 ml-1 pl-1 border-l border-blue-200">
+              <!-- Kategori Sıralama Kontrolleri (Yalnızca Şablon Modifiye Modunda Görünür) -->
+              <div class="category-modifier-controls hidden flex items-center space-x-1 shrink-0 ml-1 pl-1 border-l border-blue-200">
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionAzot', -1)" class="w-6 h-6 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionAzot', 1)" class="w-6 h-6 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSectionToExtreme('sectionAzot', 'bottom')" class="px-2 py-0.5 bg-white hover:bg-blue-100 text-blue-900 border border-blue-300 rounded text-[10px] font-bold transition shadow-2xs cursor-pointer flex items-center gap-1" title="Kategoriyi En Sona Taşı">
@@ -2474,8 +2474,8 @@
             </div>
             <div class="flex items-center space-x-2 shrink-0">
               <span id="txtModalPKBazNotice" class="text-[10px] text-emerald-800 italic font-bold hidden sm:inline">Girdiğiniz veriler Yaş Bazdır; Kuru seçildiğinde Nihai Sonuç hesaplanır</span>
-              <!-- Kategori Sıralama Kontrolleri -->
-              <div class="flex items-center space-x-1">
+              <!-- Kategori Sıralama Kontrolleri (Yalnızca Şablon Modifiye Modunda Görünür) -->
+              <div class="category-modifier-controls hidden flex items-center space-x-1">
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionPK', -1)" class="w-6 h-6 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionPK', 1)" class="w-6 h-6 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSectionToExtreme('sectionPK', 'bottom')" class="px-2 py-0.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded text-[10px] font-bold transition shadow-2xs cursor-pointer flex items-center gap-1" title="Kategoriyi En Sona Taşı">
@@ -2648,8 +2648,8 @@
               </h4>
               <span class="text-[10px] text-teal-700 italic hidden sm:inline">Analiz Sonucu Kalite Değerlendirmesi</span>
             </div>
-            <!-- Kategori Sıralama Kontrolleri -->
-            <div class="flex items-center space-x-1 shrink-0">
+            <!-- Kategori Sıralama Kontrolleri (Yalnızca Şablon Modifiye Modunda Görünür) -->
+            <div class="category-modifier-controls hidden flex items-center space-x-1 shrink-0">
               <span class="text-[9.5px] font-bold text-teal-900 hidden sm:inline mr-0.5">Kategori:</span>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionUygunluk', -1)" class="w-6 h-6 bg-white hover:bg-teal-100 text-teal-900 border border-teal-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionUygunluk', 1)" class="w-6 h-6 bg-white hover:bg-teal-100 text-teal-900 border border-teal-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
@@ -2694,7 +2694,7 @@
             <h4 class="font-bold text-purple-950 uppercase text-[11px] flex items-center gap-1.5">
               <i class="fa-solid fa-shapes text-purple-600"></i> Özel Şablon Alanları (Modifiye Alanları)
             </h4>
-            <div class="flex items-center space-x-1 shrink-0">
+            <div class="category-modifier-controls hidden flex items-center space-x-1 shrink-0">
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionCustomFields', -1)" class="w-6 h-6 bg-white hover:bg-purple-100 text-purple-900 border border-purple-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionCustomFields', 1)" class="w-6 h-6 bg-white hover:bg-purple-100 text-purple-900 border border-purple-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
               <button type="button" onclick="event.stopPropagation(); moveTemplateSectionToExtreme('sectionCustomFields', 'bottom')" class="px-2 py-0.5 bg-white hover:bg-purple-100 text-purple-900 border border-purple-300 rounded text-[10px] font-bold transition shadow-2xs cursor-pointer flex items-center gap-1" title="Kategoriyi En Sona Taşı">
@@ -2717,7 +2717,7 @@
 
         <!-- DOKÜMAN, RESİM VE EKLER YÜKLEME BÖLÜMÜ -->
                 <!-- CANLI MODİFİYE: YENİ KATEGORİ EKLEME HIZLI KARTI -->
-        <div id="quickAddCategoryCard" class="block p-3 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl bg-purple-50/40 text-center transition cursor-pointer group my-3" onclick="openAddCategoryModal()">
+        <div id="quickAddCategoryCard" class="hidden p-3 border-2 border-dashed border-purple-300 hover:border-purple-500 rounded-xl bg-purple-50/40 text-center transition cursor-pointer group my-3" onclick="openAddCategoryModal()">
           <div class="flex items-center justify-center space-x-2 text-purple-800 font-bold text-xs group-hover:text-purple-950">
             <div class="w-6 h-6 rounded-full bg-purple-200 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition">
               <i class="fa-solid fa-plus text-xs"></i>
@@ -2789,11 +2789,13 @@
                 </div>
               </div>
               <div class="flex items-center gap-1.5">
-                <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionRawMaterials', -1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
-                <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionRawMaterials', 1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
-                <button type="button" onclick="event.stopPropagation(); moveTemplateSectionToExtreme('sectionRawMaterials', 'bottom')" class="px-2 py-0.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition shadow-2xs cursor-pointer flex items-center gap-1" title="Kategoriyi En Sona Taşı">
-                  <i class="fa-solid fa-angles-down text-[8.5px]"></i> <span>En Sona</span>
-                </button>
+                <div class="category-modifier-controls hidden flex items-center space-x-1">
+                  <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionRawMaterials', -1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
+                  <button type="button" onclick="event.stopPropagation(); moveTemplateSection('sectionRawMaterials', 1)" class="w-6 h-6 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
+                  <button type="button" onclick="event.stopPropagation(); moveTemplateSectionToExtreme('sectionRawMaterials', 'bottom')" class="px-2 py-0.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded text-[10px] font-bold transition shadow-2xs cursor-pointer flex items-center gap-1" title="Kategoriyi En Sona Taşı">
+                    <i class="fa-solid fa-angles-down text-[8.5px]"></i> <span>En Sona</span>
+                  </button>
+                </div>
                 <button type="button" onclick="openRawMaterialsConfigModal(null, false)" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10.5px] font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer" title="Bu analiz kaydına özel hammadde içerik oranlarını ve reçete katsayılarını belirleyin">
                   <i class="fa-solid fa-sliders text-xs"></i> <span>Hammadde İçerikleri (Bu Kayda Özel)</span>
                 </button>
@@ -12054,6 +12056,12 @@ const DEFAULT_TEMPLATE_FIELDS = [
     }
 
     function removeTemplateCategory(secId) {
+      if (!liveFormModifierMode) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Kategori çıkarma işlemi yalnızca 'Şablon' modunda yapılabilir.");
+        }
+        return;
+      }
       const meta = TEMPLATE_SECTIONS_META.find(s => s.id === secId);
       const secName = meta ? meta.shortName : "Kategori";
 
@@ -12171,7 +12179,7 @@ const DEFAULT_TEMPLATE_FIELDS = [
                 </h4>
                 <span class="text-[10px] ${theme.subTextColor} italic hidden sm:inline">Özel Kategori</span>
               </div>
-              <div class="flex items-center space-x-1 shrink-0">
+              <div class="category-modifier-controls ${(typeof liveFormModifierMode !== 'undefined' && liveFormModifierMode) ? '' : 'hidden'} flex items-center space-x-1 shrink-0">
                 <span class="text-[9.5px] font-bold ${theme.textColor} hidden sm:inline mr-0.5">Kategori:</span>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('${cat.id}', -1)" class="w-6 h-6 bg-white ${theme.btnHover} border rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Yukarı Taşı (▲)">▲</button>
                 <button type="button" onclick="event.stopPropagation(); moveTemplateSection('${cat.id}', 1)" class="w-6 h-6 bg-white ${theme.btnHover} border rounded flex items-center justify-center text-xs font-bold transition shadow-2xs cursor-pointer" title="Kategoriyi Aşağı Taşı (▼)">▼</button>
@@ -12247,12 +12255,17 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         }
       });
 
-      // Yeni Kategori Ekleme Kartı (quickAddCategoryCard) daima kategorilerin hemen altında ve görünür kalsın
+      // Yeni Kategori Ekleme Kartı (quickAddCategoryCard) yalnızca Şablon Modifiye modunda görünür
       const quickAddCat = document.getElementById("quickAddCategoryCard");
       if (quickAddCat && quickAddCat.parentNode === body) {
         body.appendChild(quickAddCat);
-        quickAddCat.classList.remove("hidden");
-        quickAddCat.style.display = "";
+        if (typeof liveFormModifierMode !== "undefined" && liveFormModifierMode) {
+          quickAddCat.classList.remove("hidden");
+          quickAddCat.style.display = "";
+        } else {
+          quickAddCat.classList.add("hidden");
+          quickAddCat.style.display = "none";
+        }
       }
 
       // Doküman ve Denetim İzi (Audit) kartları daima formun en altında kalsın
@@ -12288,6 +12301,15 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     }
 
     function moveTemplateSection(secId, direction) {
+      if (!liveFormModifierMode) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Kategori sıralaması yalnızca 'Şablon' modunda değiştirilebilir.");
+        }
+        return;
+      }
+
+      const meta = TEMPLATE_SECTIONS_META.find(s => s.id === secId);
+      const secName = meta ? meta.shortName : "Kategori";
       const fullOrder = getSavedTemplateSectionOrder();
 
       // Sadece formda fiilen ekranda görünen (hidden olmayan) bölümleri tespit et
@@ -12303,13 +12325,14 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
       const targetVisIdx = visIdx + direction;
       if (targetVisIdx < 0 || targetVisIdx >= visibleSecIds.length) {
         if (typeof showToastNotification === "function") {
-          const meta = TEMPLATE_SECTIONS_META.find(s => s.id === secId);
-          showToastNotification(`"${meta ? meta.shortName : 'Kategori'}" zaten en ${direction > 0 ? 'altta' : 'üstte'}.`);
+          showToastNotification(`"${secName}" zaten en ${direction > 0 ? 'altta' : 'üstte'}.`);
         }
         return;
       }
 
       const otherSecId = visibleSecIds[targetVisIdx];
+      const otherMeta = TEMPLATE_SECTIONS_META.find(s => s.id === otherSecId);
+      const otherName = otherMeta ? otherMeta.shortName : "Diğer";
 
       // fullOrder dizisinde bu iki görünen kategorinin yerini takas et
       const idxA = fullOrder.indexOf(secId);
@@ -12356,16 +12379,18 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
       // Ekranı kesinlikle yukarı-aşağı fırlatmadan sadece hareket eden kategoriyi takip et
       scrollModalToSection(secId, "auto");
 
-      const meta = TEMPLATE_SECTIONS_META.find(s => s.id === secId);
-      const otherMeta = TEMPLATE_SECTIONS_META.find(s => s.id === otherSecId);
-      const secName = meta ? meta.shortName : "Kategori";
-      const otherName = otherMeta ? otherMeta.shortName : "Diğer";
       if (typeof showToastNotification === "function") {
         showToastNotification(`"${secName}" kategorisi "${otherName}" ile yer değiştirdi (${direction > 0 ? "aşağı" : "yukarı"}).`);
       }
     }
 
     function moveTemplateSectionToExtreme(secId, extreme) {
+      if (!liveFormModifierMode) {
+        if (typeof showToastNotification === "function") {
+          showToastNotification("Kategori sıralaması yalnızca 'Şablon' modunda değiştirilebilir.");
+        }
+        return;
+      }
       const currentOrder = getSavedTemplateSectionOrder();
       const idx = currentOrder.indexOf(secId);
       if (idx === -1) return;
@@ -13554,15 +13579,24 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
             }
           }
 
-          // 7.1. KULLANICI KURALI: KATEGORİ VE KATEGORİ SIRALAMASI SENKRONİZASYONU
-          // Diğer bilgisayarda yapılan kategori yeri veya özel kategori ekleme/silme değişikliklerini anında yansıt
+          // 7.1. KULLANICI KURALI: KATEGORİ VE KATEGORİ SIRALAMASI SENKRONİZASYONU (KÖKLÜ ÇÖZÜM)
+          // Diğer bilgisayarda yapılan kategori yeri veya özel kategori ekleme/silme değişikliklerini anında ve eksiksiz benimse
           const localOrderTs = parseInt(SafeStorage.getItem("LAB_ERP_SECTION_ORDER_TS") || "0", 10);
           const remoteOrderTs = parseInt(db.templateSectionOrderTs || (db.timestamp || 0), 10);
+          const isCategoryAction = db.action && (
+            db.action.includes("Kategori") || 
+            db.action.includes("Şablon") || 
+            db.action.includes("Sıralama") ||
+            db.action.includes("Taşıma")
+          );
 
           if (Array.isArray(db.templateSectionOrder) && db.templateSectionOrder.length > 0) {
-            if (remoteOrderTs >= localOrderTs || isUserInitiated) {
+            // Otoriter uzaktan gelen kategori sırasını benimse: Eylem bir kategori/şablon eylemi ise veya uzak zaman damgası yeniyse
+            if (isCategoryAction || remoteOrderTs >= localOrderTs || isUserInitiated || !localOrderTs) {
               SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(db.templateSectionOrder));
-              SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(remoteOrderTs));
+              SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(remoteOrderTs || Date.now()));
+              // Kullanıcı özel tablo sıralamasını sıfırla ki kategori sırasını takip etsin
+              SafeStorage.removeItem("LAB_ERP_CUSTOM_COLUMN_ORDER");
             }
           }
 
@@ -13570,9 +13604,9 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           const remoteCustomCatsTs = parseInt(db.customCategoriesTs || (db.timestamp || 0), 10);
 
           if (Array.isArray(db.customCategories)) {
-            if (remoteCustomCatsTs >= localCustomCatsTs || isUserInitiated) {
+            if (isCategoryAction || remoteCustomCatsTs >= localCustomCatsTs || isUserInitiated || !localCustomCatsTs) {
               SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(db.customCategories));
-              SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES_TS", String(remoteCustomCatsTs));
+              SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES_TS", String(remoteCustomCatsTs || Date.now()));
             }
           }
 
@@ -13580,9 +13614,9 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           const remoteRemovedCatsTs = parseInt(db.removedCategoriesTs || (db.timestamp || 0), 10);
 
           if (Array.isArray(db.removedCategories)) {
-            if (remoteRemovedCatsTs >= localRemovedCatsTs || isUserInitiated) {
+            if (isCategoryAction || remoteRemovedCatsTs >= localRemovedCatsTs || isUserInitiated || !localRemovedCatsTs) {
               SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(db.removedCategories));
-              SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES_TS", String(remoteRemovedCatsTs));
+              SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES_TS", String(remoteRemovedCatsTs || Date.now()));
             }
           }
 
@@ -13590,9 +13624,26 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           try {
             syncTemplateSectionsMeta();
             renderCustomCategoryCardsInDOM();
-            applyTemplateSectionOrder(null, false);
+            const adoptedOrder = getSavedTemplateSectionOrder();
+            applyTemplateSectionOrder(adoptedOrder, false);
             refreshCategorySelectDropdowns();
             renderModifierSectionOrderList();
+
+            // templateFields alan sıralamasını da yeni kategori sıralamasına göre derhal hizala
+            if (Array.isArray(templateFields)) {
+              const domOrder = (typeof getTemplateDOMFieldOrder === "function") ? getTemplateDOMFieldOrder() : [];
+              if (domOrder.length > 0) {
+                templateFields.sort((a, b) => {
+                  const idxA = domOrder.indexOf(a.key);
+                  const idxB = domOrder.indexOf(b.key);
+                  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                  if (idxA !== -1) return -1;
+                  if (idxB !== -1) return 1;
+                  return 0;
+                });
+                SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+              }
+            }
           } catch(catErr) {
             console.warn("Category sync UI refresh error:", catErr);
           }
@@ -20922,6 +20973,12 @@ function openTableModifierModal(e) {
       }
 
       document.querySelectorAll(".live-section-drop-zone").forEach(el => el.classList.remove("hidden"));
+      document.querySelectorAll(".category-modifier-controls").forEach(el => el.classList.remove("hidden"));
+      const qCatOpen = document.getElementById("quickAddCategoryCard");
+      if (qCatOpen) {
+        qCatOpen.classList.remove("hidden");
+        qCatOpen.style.display = "";
+      }
       
       // Şablon Modifiye ekranında TÜM bölümler ve etkin tüm alanlar eksiksiz açık ve düzenlenebilir olsun:
       const allActiveSections = TEMPLATE_SECTIONS_META.map(s => s.id);
@@ -21020,6 +21077,20 @@ function openTableModifierModal(e) {
         btnToggleNutrientsSave.innerHTML = '<i class="fa-solid fa-eye text-xs"></i><span>Tümünü Göster</span>';
       }
       onModalProductChange();
+
+      // Şablon değişikliklerini ve güncel kategori sırasını buluta derhal aktar
+      try {
+        const finalCatOrder = getSavedTemplateSectionOrder();
+        saveCategorySectionOrderToStorage(finalCatOrder, "Şablon Değişiklikleri Kaydedildi");
+        if (typeof markLocalDatabaseModified === "function") {
+          markLocalDatabaseModified("Şablon Değişiklikleri Kaydedildi");
+        }
+        if (typeof triggerCloudSyncImmediate === "function") {
+          triggerCloudSyncImmediate("Şablon Değişiklikleri Kaydedildi");
+        }
+      } catch(e) {
+        console.error("Şablon kaydetme bulut gönderim hatası:", e);
+      }
 
       if (typeof showToastNotification === "function") {
         showToastNotification("Şablon güncellendi! Yeni kayıt ekranınıza geri dönüldü, tüm verileriniz korundu.");
@@ -21156,6 +21227,12 @@ function openTableModifierModal(e) {
           detachLiveModifierBarsFromFields();
         }
         document.querySelectorAll(".live-section-drop-zone").forEach(el => el.classList.add("hidden"));
+        document.querySelectorAll(".category-modifier-controls").forEach(el => el.classList.add("hidden"));
+        const qCatExit = document.getElementById("quickAddCategoryCard");
+        if (qCatExit) {
+          qCatExit.classList.add("hidden");
+          qCatExit.style.display = "none";
+        }
         restoreEntryModalNormalHeaderAndFooter();
       } catch(err) {
         console.error("exitLiveFormModifierMode error:", err);
@@ -21167,8 +21244,8 @@ function openTableModifierModal(e) {
       const footerEl = document.getElementById("entryModalFooter");
       const qCat = document.getElementById("quickAddCategoryCard");
       if (qCat) {
-        qCat.classList.remove("hidden");
-        qCat.style.display = "";
+        qCat.classList.add("hidden");
+        qCat.style.display = "none";
       }
 
       if (headerEl) {
@@ -21183,10 +21260,6 @@ function openTableModifierModal(e) {
             </div>
           </div>
           <div class="flex items-center space-x-2">
-            <button type="button" onclick="openAddCategoryModal()" class="bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-600 hover:to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-teal-400/30 cursor-pointer" title="Forma Yeni Şablon Kategorisi Ekle" tabindex="-1">
-              <i class="fa-solid fa-layer-group text-teal-200"></i>
-              <span>+ Kategori Ekle</span>
-            </button>
             <button type="button" id="btnModalToggleModifierHeader" onclick="openTableModifierModal(event)" class="bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow flex items-center space-x-1.5 transition border border-purple-400/30 cursor-pointer" title="Şablonu ve Form Alanlarını Modifiye Et" tabindex="-1">
               <i class="fa-solid fa-shapes text-purple-300"></i>
               <span>Şablonu Modifiye Et</span>
@@ -37985,15 +38058,43 @@ function closeModal() {
     // ========================================================
     function saveCategorySectionOrderToStorage(order, actionDesc = "Kategori Sıralaması") {
       try {
+        const now = Date.now();
         SafeStorage.setItem("LAB_ERP_TEMPLATE_SECTION_ORDER", JSON.stringify(order));
-        SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(Date.now()));
+        SafeStorage.setItem("LAB_ERP_SECTION_ORDER_TS", String(now));
+
+        // 1. Şablondaki alanları yeni kategori sırasına göre derhal sırala ve kaydet
+        if (Array.isArray(templateFields)) {
+          const domOrder = (typeof getTemplateDOMFieldOrder === "function") ? getTemplateDOMFieldOrder() : [];
+          if (domOrder.length > 0) {
+            templateFields.sort((a, b) => {
+              const idxA = domOrder.indexOf(a.key);
+              const idxB = domOrder.indexOf(b.key);
+              if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+              if (idxA !== -1) return -1;
+              if (idxB !== -1) return 1;
+              return 0;
+            });
+            templateFields.forEach(tf => { tf.updatedAt = now; });
+            saveTemplateFieldsToStorage();
+          }
+        }
+
+        // 2. Tablo kolon özel sırasını sıfırla ki kategori sırasını takip etsin
+        SafeStorage.removeItem("LAB_ERP_CUSTOM_COLUMN_ORDER");
+
+        // 3. Buluta ve diğer bilgisayarlara derhal ilet
         if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
             typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
           if (typeof markLocalDatabaseModified === "function") {
             markLocalDatabaseModified(actionDesc);
           }
+          if (typeof triggerCloudSyncImmediate === "function") {
+            triggerCloudSyncImmediate(actionDesc);
+          }
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error("saveCategorySectionOrderToStorage hatası:", e);
+      }
     }
 
     function saveCustomCategoriesToStorage(customCats, actionDesc = "Özel Kategori Güncellemesi") {
