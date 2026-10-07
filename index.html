@@ -13640,8 +13640,15 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         const sep = targetUrl.includes("?") ? "&" : "?";
         targetUrl = targetUrl + sep + "auth=" + encodeURIComponent(token);
       }
-      // Tarayıcı CORS kısıtlamalarına takılmamak için standart fetch kullanılır
-      const res = await fetch(targetUrl);
+      let res = await fetch(targetUrl);
+      if (!res.ok && res.status === 401 && token) {
+        // Token geçersiz veya süresi dolmuşsa, doğrudan açık veritabanı uç noktası ile tekrar dene
+        console.warn("Firebase 401 token hatası, doğrudan erişim deneniyor...");
+        firebaseAuthToken = null;
+        try { sessionStorage.removeItem("FIREBASE_AUTH_TOKEN"); } catch(e){}
+        const cleanUrl = endpoint.replace(/([?&])auth=[^&]+(&|$)/, '$1').replace(/[?&]$/, '');
+        res = await fetch(cleanUrl);
+      }
       if (!res.ok) throw new Error("HTTP GET " + res.status + " " + await res.text());
       const data = await res.json();
       return { data: data, etag: null };
@@ -13654,12 +13661,23 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         const sep = targetUrl.includes("?") ? "&" : "?";
         targetUrl = targetUrl + sep + "auth=" + encodeURIComponent(token);
       }
-      // Tarayıcı CORS ön uçuş (preflight) engellerini aşmak için standart PUT kullanılır
-      const res = await fetch(targetUrl, {
+      let res = await fetch(targetUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+      if (!res.ok && res.status === 401 && token) {
+        // Token geçersiz veya süresi dolmuşsa, doğrudan açık veritabanı uç noktası ile tekrar dene
+        console.warn("Firebase PUT 401 token hatası, doğrudan erişim deneniyor...");
+        firebaseAuthToken = null;
+        try { sessionStorage.removeItem("FIREBASE_AUTH_TOKEN"); } catch(e){}
+        const cleanUrl = endpoint.replace(/([?&])auth=[^&]+(&|$)/, '$1').replace(/[?&]$/, '');
+        res = await fetch(cleanUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
       if (!res.ok) throw new Error("HTTP PUT " + res.status + " " + await res.text());
       return res;
     }
@@ -13805,8 +13823,8 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
     async function triggerFirebasePull(isUserInitiated = false) {
       if (typeof fetch === "undefined") return;
       if (!isUserInitiated) {
-        if (hasUnsavedLocalUserEdits || isCloudSyncInProgress || isApplyingRemoteCloudSync || cloudSyncDebounceTimer || pendingCloudPushAction) return;
-        if (lastLocalUserEditTime && (Date.now() - lastLocalUserEditTime < 3000)) return;
+        if (isCloudSyncInProgress || isApplyingRemoteCloudSync || cloudSyncDebounceTimer || pendingCloudPushAction) return;
+        if (lastLocalUserEditTime && (Date.now() - lastLocalUserEditTime < 2000)) return;
       }
 
       const endpoint = getFirebaseEndpoint();
@@ -13840,7 +13858,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           return;
         }
 
-        if (!isUserInitiated || !loadCloudBaseline()) saveCloudBaseline(db);
+        // Baseline guncellemesi birlesim sonrasina tasindi
 
         if (db.sourceClientId && db.sourceClientId === ERP_CLIENT_INSTANCE_ID && !isUserInitiated) {
           setCloudStatusReady(Array.isArray(labRecords) ? labRecords.length : 0);
@@ -13909,11 +13927,61 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
           }
         }
 
+        // Şablon Alanları (templateFields) Buluttan Senkronizasyonu
+        if (Array.isArray(db.templateFields) && db.templateFields.length > 0) {
+          if (JSON.stringify(templateFields) !== JSON.stringify(db.templateFields)) {
+            templateFields = db.templateFields;
+            SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
+            if (typeof syncAllColumnsFromTemplateFields === "function") syncAllColumnsFromTemplateFields();
+            dataChanged = true;
+          }
+        }
+
+        // Sütun Genişlikleri (fieldColSpans)
+        if (db.fieldColSpans && Object.keys(db.fieldColSpans).length > 0) {
+          SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS", JSON.stringify(db.fieldColSpans));
+          if (db.fieldColSpansTs) SafeStorage.setItem("LAB_ERP_FIELD_COL_SPANS_TS", String(db.fieldColSpansTs));
+        }
+
+        // Özel Kategoriler (customCategories & removedCategories)
+        if (Array.isArray(db.customCategories)) {
+          SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES", JSON.stringify(db.customCategories));
+          if (db.customCategoriesTs) SafeStorage.setItem("LAB_ERP_CUSTOM_CATEGORIES_TS", String(db.customCategoriesTs));
+        }
+        if (Array.isArray(db.removedCategories)) {
+          SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES", JSON.stringify(db.removedCategories));
+          if (db.removedCategoriesTs) SafeStorage.setItem("LAB_ERP_REMOVED_CATEGORIES_TS", String(db.removedCategoriesTs));
+        }
+
+        // Kategori Sıraları ve Renkleri
+        if (db.categoryOptionOrders) {
+          for (const [k, arr] of Object.entries(db.categoryOptionOrders)) {
+            if (Array.isArray(arr)) {
+              SafeStorage.setItem("LAB_ERP_OPTION_ORDER_" + k, JSON.stringify(arr));
+            }
+          }
+        }
+        if (db.categoryOptionColors && typeof window !== "undefined") {
+          window.CATEGORY_CUSTOM_COLORS = Object.assign({}, window.CATEGORY_CUSTOM_COLORS, db.categoryOptionColors);
+          SafeStorage.setItem("LAB_ERP_CATEGORY_OPTION_COLORS", JSON.stringify(window.CATEGORY_CUSTOM_COLORS));
+        }
+
+        // Sol Panel Kırılımları (sidebarFacets)
+        if (Array.isArray(db.sidebarFacets) && db.sidebarFacets.length > 0) {
+          if (JSON.stringify(SIDEBAR_FACET_FIELDS) !== JSON.stringify(db.sidebarFacets)) {
+            SIDEBAR_FACET_FIELDS = db.sidebarFacets;
+            saveSidebarFacetsToStorage();
+            if (typeof renderSidebarFacetSectionsDOM === "function") renderSidebarFacetSectionsDOM();
+          }
+        }
+
         if (dataChanged || isUserInitiated) {
           saveLabRecordsToStorage();
           saveDeletedRecordsToStorage();
+          if (typeof applyMasterTemplate === "function") applyMasterTemplate();
           refreshAllDropdowns();
           applyTableFilters();
+          if (typeof updateSidebarCounts === "function") updateSidebarCounts(labRecords);
         }
 
         lastAppliedRemoteTimestamp = remoteTs || Date.now();
@@ -13923,6 +13991,7 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
 
         SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_TS", String(lastAppliedRemoteTimestamp));
         SafeStorage.setItem("LAB_ERP_LAST_APPLIED_REMOTE_REV", String(lastAppliedRemoteRevision));
+        saveCloudBaseline({ records: labRecords, deletedRecords: deletedRecords });
 
         setCloudStatusReady(Array.isArray(labRecords) ? labRecords.length : 0);
 
@@ -14161,7 +14230,11 @@ function applyTemplateSectionOrder(order = null, shouldSave = false, targetSecId
         if(ok){SafeStorage.removeItem("LAB_ERP_RECORDS");SafeStorage.removeItem("LAB_ERP_MASTER_DATABASE");}
         else {try{localStorage.setItem("LAB_ERP_RECORDS",JSON.stringify(records));}catch(e){erpStorageWarning("KALICI KAYIT BAŞARISIZ. Sayfayı kapatmadan JSON yedeği indirin.");return false;}}
         SafeStorage.setItem("LAB_ERP_INITIAL_SEEDED","true");SafeStorage.setItem("LAB_ERP_RECORD_COUNT",String(records.length));
-        erpSetStatus("Yerel kayıt tamamlandı • "+records.length+" kayıt");return true;
+        erpSetStatus("Kayıt tamamlandı • "+records.length+" kayıt");
+        if (typeof markLocalDatabaseModified === "function" && typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
+          markLocalDatabaseModified("Kayıt Güncellemesi");
+        }
+        return true;
       });
       const own=erpSaveQueue;own.then(ok=>{if(erpSaveQueue===own){erpPendingSave=!ok;if(ok)createAutoBackupSnapshot();}});return own;
     }
@@ -39100,7 +39173,7 @@ function closeModal(force = false) {
         }
         SafeStorage.setItem("LAB_ERP_TEMPLATE_FIELDS", JSON.stringify(templateFields));
         if (typeof isAppInitializing !== "undefined" && !isAppInitializing &&
-            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync && modifiedKey) {
+            typeof isApplyingRemoteCloudSync !== "undefined" && !isApplyingRemoteCloudSync) {
           if (typeof markLocalDatabaseModified === "function") {
             markLocalDatabaseModified(typeof modifiedKey === "string" ? `Şablon Alanı Güncellemesi: ${modifiedKey}` : "Şablon Alanları Güncellemesi");
           }
@@ -41734,13 +41807,14 @@ function renderCustomFieldsInEntryModal() {
       erpApplyPotassiumSchema();
       
       // Oturum hatırlama: Sayfa yenilendiğinde aktif kullanıcı oturumunu kesinlikle koru
+      const isExplicitlyLoggedOut = SafeStorage.getItem('LAB_ERP_EXPLICIT_LOGOUT') === 'true';
       const savedUserId = SafeStorage.getItem('LAB_ERP_ACTIVE_USER_ID') || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ERP_SESSION_USER_ID') : null);
-      let matchedUser = savedUserId ? usersList.find(u => u.id === savedUserId && u.active !== false) : null;
-      if (!matchedUser && !activeUser) {
+      let matchedUser = (!isExplicitlyLoggedOut && savedUserId) ? usersList.find(u => u.id === savedUserId && u.active !== false) : null;
+      if (!isExplicitlyLoggedOut && !matchedUser && !activeUser) {
         // Varsayılan olarak yönetici hesabını seçili başlat (kullanıcıyı her yenilemede şifreye boğma)
         matchedUser = usersList.find(u => u.role === 'admin' && u.active !== false) || usersList[0];
       }
-      if (matchedUser) {
+      if (matchedUser && !isExplicitlyLoggedOut) {
         activeUser = matchedUser;
         erpSessionUserId = matchedUser.id;
         SafeStorage.setItem('LAB_ERP_ACTIVE_USER_ID', matchedUser.id);
@@ -41761,13 +41835,17 @@ function renderCustomFieldsInEntryModal() {
       }
     }
     function erpLogout(){
+      SafeStorage.setItem('LAB_ERP_EXPLICIT_LOGOUT', 'true');
       sessionStorage.removeItem('ERP_SESSION_USER_ID');
       erpSessionUserId=null;
       activeUser=null;
       SafeStorage.removeItem('LAB_ERP_ACTIVE_USER_ID');
       if (typeof firebaseSignOut === "function") firebaseSignOut();
       const gate=document.getElementById('erpAccessGate');
-      if(gate){gate.hidden=false;gate.style.display='flex';}
+      if(gate){
+        gate.hidden=false;
+        gate.style.setProperty("display", "flex", "important");
+      }
       const select=document.getElementById('erpLoginUser');
       if(select){
         select.innerHTML='';
@@ -41811,7 +41889,7 @@ function renderCustomFieldsInEntryModal() {
           if(next!==document.getElementById('erpRepeatPassword').value)throw Error('Yeni şifre ve tekrarı uyuşmuyor.');
           u.passwordHash=await erpHashPassword(next);u.mustChangePassword=false;delete u.password;saveUsersToStorage();
         }
-        erpLoginAttempts.delete(userId);activeUser=u;erpSessionUserId=u.id;sessionStorage.setItem('ERP_SESSION_USER_ID', u.id);SafeStorage.setItem('LAB_ERP_ACTIVE_USER_ID', u.id);
+        erpLoginAttempts.delete(userId);SafeStorage.removeItem('LAB_ERP_EXPLICIT_LOGOUT');activeUser=u;erpSessionUserId=u.id;sessionStorage.setItem('ERP_SESSION_USER_ID', u.id);SafeStorage.setItem('LAB_ERP_ACTIVE_USER_ID', u.id);
         const gate=document.getElementById('erpAccessGate');gate.hidden=true;gate.style.display='none';
         closePasswordPromptModal();applyUserPermissionsToUI();renderQuickUserSwitchMenu();applyTableFilters();
         document.getElementById('erpLoginPassword').value='';document.getElementById('erpNewPassword').value='';document.getElementById('erpRepeatPassword').value='';
@@ -44107,7 +44185,7 @@ function renderCustomFieldsInEntryModal() {
 .erp-user-card{display:flex;align-items:center;gap:11px;width:100%;padding:12px;margin:4px 0;border:1px solid transparent;border-radius:13px;background:#fff;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}.erp-user-card:hover{background:#f5f3ff;border-color:#ddd6fe}.erp-user-card.is-active{background:#f5f3ff;border-color:#c4b5fd}.erp-user-avatar{display:grid;place-items:center;flex:0 0 38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4338ca);color:white;font-size:13px;font-weight:800}.erp-user-info{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}.erp-user-info strong{color:#1e293b;font-size:12px;white-space:normal}.erp-user-info small{font-size:10px;color:#64748b}.erp-user-role{border-radius:20px;background:#ede9fe;color:#6d28d9;font-size:9px;padding:4px 7px;font-weight:700}.erp-user-logout{width:100%;padding:11px;border-top:1px solid #e2e8f0;margin-top:8px;font-size:12px;color:#b91c1c}
 #erpReviewBar{position:fixed;bottom:6px;right:12px;z-index:2000000;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font:11px system-ui;display:flex;gap:10px;align-items:center;box-shadow:0 1px 6px #0002}
 #erpReviewBar button{border:0;background:#334155;color:white;padding:5px 9px;border-radius:4px;cursor:pointer}
-#erpAccessGate{position:fixed;inset:0;z-index:2147483647;background:#0f172a;display:flex;align-items:center;justify-content:center;font:14px system-ui;color:#0f172a}
+#erpAccessGate{position:fixed;inset:0;z-index:2147483647;background:#0f172a;display:none;align-items:center;justify-content:center;font:14px system-ui;color:#0f172a}
 #erpAccessGate [hidden]{display:none!important}
 #erpAccessGate form{background:white;border-radius:16px;padding:28px;width:420px;max-width:90vw;max-height:90vh;overflow:auto;box-shadow:0 15px 55px #0007}
 #erpAccessGate label{display:block;margin:12px 0 5px;font-weight:600}#erpAccessGate input,#erpAccessGate select{box-sizing:border-box;width:100%;padding:11px;border:1px solid #94a3b8;border-radius:6px;background:white;color:#0f172a}
@@ -44116,7 +44194,7 @@ function renderCustomFieldsInEntryModal() {
 @media print{#erpReviewBar,#erpAccessGate,#erpReviewDialog{display:none!important}}
 </style>
 <div id="erpReviewBar"><i class="fa-solid fa-cloud text-emerald-400"></i><span id="erpCloudLabel">Bulut: Canlı (Firebase)</span><span id="erpSaveStatus" role="status" aria-live="polite">Hazırlanıyor…</span></div>
-<div id="erpAccessGate" role="dialog" aria-modal="true" aria-label="Yerel kullanıcı girişi">
+<div id="erpAccessGate" role="dialog" aria-modal="true" aria-label="Kullanıcı girişi" style="display: none;" hidden>
 <form onsubmit="event.preventDefault(); erpAuthenticate(document.getElementById('erpLoginUser').value,document.getElementById('erpLoginPassword').value)">
 <h1 style="font-size:23px;font-weight:700;margin:0">Laboratuvar ERP</h1><p style="color:#64748b;margin:5px 0 16px">Yerel kullanıcı girişi</p>
 <label for="erpLoginUser">Kullanıcı</label><select id="erpLoginUser" onchange="erpRefreshLogin()"></select>
